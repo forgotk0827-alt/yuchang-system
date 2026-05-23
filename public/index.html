@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>煜昌电器改善提案系统</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主内容</a>
+    <div id="app">
+      <section class="login-shell" data-view="login">
+        <div class="login-panel">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Zm4 2v2h8v-2H8Zm0 4v1.5h8v-1.5H8Zm0 3.5v1.5h5V15H8Z"/></svg>
+          </div>
+          <h1>煜昌电器改善提案系统</h1>
+          <p>提案审批、积分激励、礼品兑换与经营报表一体化管理。</p>
+          <form id="loginForm" class="form-stack">
+            <label>
+              <span>员工编号或手机号</span>
+              <input id="loginAccount" name="account" autocomplete="username" value="A001" required />
+            </label>
+            <label>
+              <span>密码</span>
+              <input id="loginPassword" name="password" type="password" autocomplete="current-password" value="123456" required />
+            </label>
+            <button class="btn primary" type="submit">登录系统</button>
+            <div class="hint">
+              测试账号：A001 管理员、E001 员工、D001 部门初审、F001 财务、L001 精益办；密码均为 123456。
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="shell hidden" data-view="main">
+        <aside class="sidebar" aria-label="主导航">
+          <div class="side-brand">
+            <div class="side-logo" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 4h14v4H5V4Zm0 6h14v4H5v-4Zm0 6h8v4H5v-4Z"/></svg>
+            </div>
+            <div>
+              <strong>改善提案系统</strong>
+              <span>Lean Improvement</span>
+            </div>
+          </div>
+          <nav id="nav" class="nav-list"></nav>
+        </aside>
+        <div class="workspace">
+          <header class="topbar">
+            <div>
+              <h2 id="pageTitle">工作台</h2>
+              <p id="pageSubtitle">查看待办、提案、积分和兑换状态。</p>
+            </div>
+            <div class="user-box">
+              <div>
+                <strong id="currentUser">-</strong>
+                <span id="currentRole">-</span>
+              </div>
+              <button class="icon-btn" id="logoutBtn" type="button" title="退出登录" aria-label="退出登录">
+                <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4v-2h4V5h-4V3Zm-1.6 5.4L16 11H7V8H5v8h2v-3h9l-2.6 2.6L14.8 17l5-5-5-5-1.4 1.4Z"/></svg>
+              </button>
+            </div>
+          </header>
+          <main id="main" class="content" tabindex="-1"></main>
+        </div>
+      </section>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
