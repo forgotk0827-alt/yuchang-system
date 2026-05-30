@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const XLSX = require("xlsx");
 const { URL } = require("url");
 
 const PORT = Number(process.env.PORT || 3000);
@@ -310,6 +311,43 @@ function csvObjects(text) {
   if (rows.length < 2) return [];
   const headers = rows[0].map((header) => header.trim());
   return rows.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ""])));
+}
+
+function rowsToObjects(rows) {
+  if (!rows.length) return [];
+  const headers = rows[0].map((header) => String(header || "").trim());
+  return rows.slice(1)
+    .map((row) => Object.fromEntries(headers.map((header, index) => [header, String(row[index] ?? "").trim()])))
+    .filter((row) => Object.values(row).some(Boolean));
+}
+
+function workbookObjects(buffer) {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const sheetName = workbook.SheetNames.find((name) => name.includes("员工")) || workbook.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "" });
+  return rowsToObjects(rows);
+}
+
+async function readImportRows(req) {
+  const contentType = req.headers["content-type"] || "";
+  if (contentType.includes("multipart/form-data")) {
+    const buffer = await readBuffer(req, MAX_UPLOAD_SIZE);
+    const file = parseMultipart(req, buffer).find((part) => part.filename);
+    if (!file) throw new Error("请选择要导入的文件");
+    const ext = path.extname(file.filename).toLowerCase();
+    if (ext === ".csv") return csvObjects(file.data.toString("utf8"));
+    if (ext === ".xls" || ext === ".xlsx") return workbookObjects(file.data);
+    throw new Error("仅支持 .csv、.xls、.xlsx 文件");
+  }
+  const body = await readBody(req);
+  return csvObjects(String(body.csv || ""));
+}
+
+function valueFrom(row, keys) {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== "") return row[key];
+  }
+  return "";
 }
 
 function requireAdminOrLean(user, res, message) {
@@ -993,31 +1031,31 @@ async function handleApi(req, res, url) {
       } else {
         return sendError(res, 404, "导入类型不存在");
       }
-      const body = await readBody(req);
-      const rows = csvObjects(String(body.csv || ""));
-      if (!rows.length) return sendError(res, 400, "CSV 内容为空或缺少表头");
+      const rows = await readImportRows(req);
+      if (!rows.length) return sendError(res, 400, "文件内容为空或缺少表头");
       let created = 0;
       let updated = 0;
       const errors = [];
 
       if (type === "departments") {
         rows.forEach((row, index) => {
-          const name = row["部门名称"] || row.name;
+          const name = valueFrom(row, ["部门名称", "1级部门", "2级部门", "部门", "name"]);
           if (!name) {
             errors.push(`第 ${index + 2} 行缺少部门名称`);
             return;
           }
           let dept = db.departments.find((item) => item.name === name);
-          const leader = db.users.find((item) => item.employeeNo === (row["负责人编号"] || row.leaderNo));
-          const parent = db.departments.find((item) => item.name === (row["上级部门"] || row.parentName));
+          const leaderNameOrNo = valueFrom(row, ["负责人编号", "部门主管", "leaderNo"]);
+          const leader = db.users.find((item) => item.employeeNo === leaderNameOrNo || item.name === leaderNameOrNo);
+          const parent = db.departments.find((item) => item.name === valueFrom(row, ["上级部门", "1级部门", "parentName"]));
           if (!dept) {
-            dept = { id: uid("d"), name, parentId: parent?.id || "", leaderId: leader?.id || "", status: row["状态"] || row.status || "启用" };
+            dept = { id: uid("d"), name, parentId: parent?.id || "", leaderId: leader?.id || "", status: valueFrom(row, ["状态", "员工状态", "status"]) || "启用" };
             db.departments.push(dept);
             created += 1;
           } else {
             dept.parentId = parent?.id || dept.parentId || "";
             dept.leaderId = leader?.id || dept.leaderId || "";
-            dept.status = row["状态"] || row.status || dept.status || "启用";
+            dept.status = valueFrom(row, ["状态", "员工状态", "status"]) || dept.status || "启用";
             updated += 1;
           }
         });
@@ -1026,19 +1064,24 @@ async function handleApi(req, res, url) {
       if (type === "users") {
         const validRoles = new Set(Object.values(ROLES));
         rows.forEach((row, index) => {
-          const employeeNo = row["员工编号"] || row.employeeNo;
-          const name = row["姓名"] || row.name;
-          const phone = row["手机号/账号"] || row.phone || employeeNo;
-          const role = row["角色"] || row.role || ROLES.EMPLOYEE;
-          if (!employeeNo || !name) {
-            errors.push(`第 ${index + 2} 行缺少员工编号或姓名`);
+          const name = valueFrom(row, ["姓名", "name"]);
+          let employeeNo = valueFrom(row, ["员工编号", "工号", "employeeNo"]);
+          let phone = valueFrom(row, ["手机号/账号", "手机号", "手机", "phone"]) || employeeNo;
+          const role = valueFrom(row, ["角色", "role"]) || ROLES.EMPLOYEE;
+          if (!name) {
+            errors.push(`第 ${index + 2} 行缺少姓名`);
             return;
           }
+          if (!employeeNo) employeeNo = phone || `AUTO_${String(index + 1).padStart(4, "0")}`;
+          if (!phone) phone = employeeNo;
           if (!validRoles.has(role)) {
             errors.push(`第 ${index + 2} 行角色无效：${role}`);
             return;
           }
-          const dept = findOrCreateDepartment(db, row["部门"] || row.department);
+          const deptName = valueFrom(row, ["2级部门", "部门", "1级部门", "department"]);
+          const dept = findOrCreateDepartment(db, deptName);
+          const rawStatus = valueFrom(row, ["在职状态", "员工状态", "status"]);
+          const status = rawStatus === "离职" ? "禁用" : (rawStatus || "在职");
           let target = db.users.find((item) => item.employeeNo === employeeNo);
           if (!target) {
             target = {
@@ -1047,10 +1090,10 @@ async function handleApi(req, res, url) {
               name,
               phone,
               deptId: dept.id,
-              post: row["岗位"] || row.post || "",
+              post: valueFrom(row, ["岗位", "职位", "post"]),
               role,
               passwordHash: hashPassword("123456"),
-              status: row["在职状态"] || row.status || "在职",
+              status,
             };
             db.users.push(target);
             accountFor(db, target.id);
@@ -1059,9 +1102,9 @@ async function handleApi(req, res, url) {
             target.name = name;
             target.phone = phone;
             target.deptId = dept.id;
-            target.post = row["岗位"] || row.post || target.post || "";
+            target.post = valueFrom(row, ["岗位", "职位", "post"]) || target.post || "";
             target.role = role;
-            target.status = row["在职状态"] || row.status || target.status || "在职";
+            target.status = status || target.status || "在职";
             updated += 1;
           }
         });

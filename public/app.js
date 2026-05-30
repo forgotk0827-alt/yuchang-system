@@ -566,8 +566,8 @@ async function renderAdmin() {
   main.innerHTML = `
     <section class="grid cols-2">
       <div class="panel pad">
-        <h3 style="margin-top:0">CSV 数据导入</h3>
-        <p class="hint">支持员工、部门、礼品三类 CSV 导入。员工初始密码统一为 123456。</p>
+        <h3 style="margin-top:0">数据导入</h3>
+        <p class="hint">支持员工、部门、礼品三类 CSV / XLS / XLSX 导入。员工初始密码统一为 123456。</p>
         <div class="tabs" style="margin:12px 0">
           <a class="tab active" href="${authUrl("/api/import/users-template")}" target="_blank" rel="noreferrer">员工模板</a>
           <a class="tab active" href="${authUrl("/api/import/departments-template")}" target="_blank" rel="noreferrer">部门模板</a>
@@ -575,7 +575,7 @@ async function renderAdmin() {
         </div>
         <form id="importForm" class="form-stack">
           <label><span>导入类型</span><select name="type"><option value="users">员工</option><option value="departments">部门</option><option value="gifts">礼品</option></select></label>
-          <label><span>CSV 文件</span><input name="csvFile" type="file" accept=".csv,text/csv" required /></label>
+          <label><span>导入文件</span><input name="importFile" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></label>
           <button class="btn primary" type="submit">开始导入</button>
         </form>
       </div>
@@ -594,14 +594,13 @@ async function renderAdmin() {
 async function handleImport(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const file = form.csvFile.files[0];
-  if (!file) return toast("请选择 CSV 文件");
+  const fd = new FormData(form);
+  const file = form.importFile.files[0];
+  if (!file) return toast("请选择导入文件");
   const submitter = event.submitter;
   try {
     submitter.disabled = true;
-    const csv = await file.text();
-    const fd = new FormData(form);
-    const result = await api(`/api/import/${fd.get("type")}`, { method: "POST", body: JSON.stringify({ csv }) });
+    const result = await api(`/api/import/${fd.get("type")}`, { method: "POST", body: fd });
     toast(`导入完成：新增 ${result.created}，更新 ${result.updated}，错误 ${result.errors.length}`);
     if (result.errors.length) {
       openModal("导入错误明细", `<div class="panel pad">${result.errors.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`);
