@@ -1,329 +1,329 @@
-# WeChat Mini-Program Full Business Design
+# 微信小程序全业务闭环设计文档
 
-## Status
+## 状态
 
-Approved design direction: WeChat mini-program covers the complete business loop, including employee workflows and administrator workflows. The existing PC web pages may remain as development/debug fallback, but the delivery target is the WeChat mini-program.
+已确认设计方向：微信小程序覆盖完整业务闭环，包括员工端业务、审批端业务和后台管理业务。现有 PC 网页可保留为开发调试或备用后台，但正式交付目标是微信小程序。
 
-## Goals
+## 建设目标
 
-Build a WeChat mini-program for Yuyao Yuchang Electric's improvement proposal, points incentive, reward redemption, approval, reporting, and administration process.
+建设一套用于余姚煜昌电器有限公司的微信小程序系统，覆盖改善提案、积分激励、礼品兑换、审批流、报表和后台管理。
 
-The system must support:
+系统必须支持：
 
-- Employee proposal submission, draft editing, draft deletion, and progress tracking.
-- Department evaluation, finance review, lean office review, and review committee approval.
-- Automatic points calculation and points ledger.
-- Gift catalog, stock reservation, redemption review, issue registration, and receipt status.
-- Employee and organization Excel import.
-- Gift maintenance.
-- Reports, ranking views, and operation logs.
-- Annual points clearing and clearing reminders.
-- In-app notifications.
+- 员工提交提案、编辑草稿、删除草稿、查看审批进度。
+- 部门评估、财务复核、精益办复审、评审委员会核准。
+- 积分自动计算和积分流水。
+- 礼品目录、库存预占、兑换审核、发放登记、领取状态。
+- 员工与组织 Excel 导入。
+- 礼品维护。
+- 报表、排行和操作日志。
+- 年度积分清零和清零提醒。
+- 站内通知。
 
-## Non-Goals
+## 非目标
 
-- Do not build a PC-first product. PC web can remain as a fallback/admin debug surface, but not as the primary delivery channel.
-- Do not implement external messaging in the first complete version. Use in-app notifications first.
-- Do not implement payment. Rewards are points-based redemptions.
-- Do not implement Enterprise WeChat integration in this phase. It can be a later upgrade.
+- 不建设 PC 优先的产品。PC 网页可以保留为备用或调试入口，但不是主要交付形态。
+- 第一版完整业务闭环不接外部消息通道，先使用站内通知。
+- 不做支付能力，礼品兑换只基于积分。
+- 本阶段不接企业微信。企业微信通讯录、身份和消息能力可作为后续升级方向。
 
-## Users And Permissions
+## 用户与权限
 
-The system uses role-based access plus data ownership checks.
+系统采用角色权限加数据归属校验。
 
-Roles:
+角色：
 
-- Normal employee: submit proposals, manage own drafts, view own approvals, points, and redemptions.
-- Department evaluation group: normal employee permissions plus evaluating proposals from authorized departments.
-- Finance reviewer: review financial-benefit proposals and upload financial calculation attachments.
-- Lean office reviewer: final review, points operations, redemption operations, gift maintenance, reports.
-- Review committee member: review proposals waiting for committee approval.
-- Super administrator: full access to users, departments, roles, rules, reports, logs, and system configuration.
+- 普通员工：提交提案、管理本人草稿、查看本人审批进度、积分和兑换记录。
+- 部门评估组：具备普通员工权限，并可评估授权部门的提案。
+- 财务复核：复核财务创效类提案，并上传财务效益核算附件。
+- 精益办复审：复审提案、处理积分运营、兑换运营、礼品维护和报表。
+- 评审委员会成员：处理待评审委员会核准的提案。
+- 超级管理员：拥有用户、部门、角色、规则、报表、日志和系统配置的全量权限。
 
-Review committee membership is a user flag, not a replacement for the user's base role.
+评审委员会成员是用户标记，不覆盖用户原有基础角色。
 
-Current review committee members:
+当前评审委员会成员：
 
 - 黄晓鹏
 - 邵海波
 - 刘佛生
 - 钱利民
 
-Login policy:
+登录规则：
 
-- Account is employee number.
-- Initial password is employee number followed by `@`, for example `YC000020@`.
+- 登录账号为员工工号。
+- 初始密码为员工工号后加 `@`，例如 `YC000020@`。
 
-## Mini-Program Information Architecture
+## 小程序信息架构
 
-Use role-aware mobile workflows instead of copying the PC web layout.
+小程序应采用按角色展示的移动端工作流，不照搬 PC 后台布局。
 
-Bottom tabs:
+底部 Tab 建议 5 个：
 
-1. Workbench
-   - Current user's pending tasks.
-   - Proposal status summary.
-   - Points summary.
-   - Notifications.
-   - Role-specific management shortcuts.
+1. 工作台
+   - 当前用户待办。
+   - 提案状态摘要。
+   - 积分摘要。
+   - 站内通知。
+   - 按角色展示的管理快捷入口。
 
-2. Proposals
-   - My proposals.
-   - Drafts.
-   - New proposal.
-   - Proposal detail.
-   - Approval history.
-   - Pending review list for reviewers.
-   - Department evaluation form.
-   - Finance review form.
-   - Lean office review form.
-   - Committee approval form.
+2. 提案
+   - 我的提案。
+   - 草稿。
+   - 新建提案。
+   - 提案详情。
+   - 审批记录。
+   - 待我审批列表。
+   - 部门评估表单。
+   - 财务复核表单。
+   - 精益办复审表单。
+   - 评审委员会核准表单。
 
-3. Points
-   - Points account.
-   - Points ledger.
-   - Points rules.
-   - Manual add/deduct for lean office and administrators.
-   - Annual clearing records.
+3. 积分
+   - 积分账户。
+   - 积分流水。
+   - 积分规则说明。
+   - 人工奖励/扣减，限精益办和管理员。
+   - 年度清零记录。
 
-4. Redemptions
-   - Gift catalog.
-   - Gift detail.
-   - Redemption application.
-   - My redemption records.
-   - Redemption review for lean office and administrators.
-   - Gift issue registration.
-   - Gift maintenance.
+4. 兑换
+   - 礼品目录。
+   - 礼品详情。
+   - 兑换申请。
+   - 我的兑换记录。
+   - 兑换审核，限精益办和管理员。
+   - 礼品发放登记。
+   - 礼品维护。
 
-5. Profile
-   - User profile.
-   - Current role and committee identity.
-   - Management center entry.
-   - Password change.
-   - Logout.
+5. 我的
+   - 个人信息。
+   - 当前角色和评审委员会身份。
+   - 管理中心入口。
+   - 修改密码。
+   - 退出登录。
 
-Management center entries are shown by permission:
+管理中心入口按权限展示：
 
-- Employee management.
-- Department management.
-- Excel import.
-- Gift management.
-- Reports.
-- Operation logs.
-- System configuration.
+- 员工管理。
+- 部门管理。
+- Excel 导入。
+- 礼品管理。
+- 报表中心。
+- 操作日志。
+- 系统配置。
 
-## Proposal Workflow
+## 提案流程
 
-Supported statuses:
+支持状态：
 
-- Draft.
-- Pending department evaluation.
-- Department evaluation rejected.
-- Pending finance review.
-- Finance review rejected.
-- Pending lean office review.
-- Lean office review rejected.
-- Pending review committee approval.
-- Review committee rejected.
-- Re-review.
-- Invalid closed.
-- Archived.
+- 草稿。
+- 待部门评估组初评。
+- 部门评估组驳回。
+- 待财务复核。
+- 财务复核驳回。
+- 待精益办复审。
+- 精益办复审驳回。
+- 待评审委员会核准。
+- 评审委员会驳回。
+- 重审中。
+- 无效关闭。
+- 已归档。
 
-Rules:
+规则：
 
-- Drafts can be edited and deleted.
-- Non-drafts cannot be deleted.
-- Rejected proposals can be edited and resubmitted.
-- Rejection requires an opinion.
-- Department evaluation must confirm on-site verification before passing normal improvement proposals.
-- Correction, restoration, and benchmarking cases are invalid for proposal rewards and close as invalid.
-- Horizontal expansion proposals are rewarded at least one level lower.
-- Financial-benefit proposals require finance review and a financial calculation attachment.
-- Level II and Level I proposals require review committee approval before points are awarded.
-- Points are issued only when the proposal reaches the final archived state.
+- 草稿可以编辑和删除。
+- 非草稿不可删除。
+- 被驳回的提案可以编辑后重新提交。
+- 驳回必须填写意见。
+- 部门评估组通过正常改善提案前，必须完成现场确认。
+- 纠错、复原、对标类事项不进行提案奖励，状态进入无效关闭。
+- 水平展开类提案按至少降低一级奖励。
+- 财务创效类提案必须经过财务复核，并上传财务效益核算附件。
+- 二级和一级提案必须经过评审委员会核准后才发放积分。
+- 只有提案进入最终归档状态后才发放积分。
 
-## Points Rules
+## 积分规则
 
-Points must be calculated by backend services. The mini-program displays calculated totals and breakdowns.
+积分必须由后端统一计算，小程序只展示计算结果和积分明细。
 
-Rules:
+规则：
 
-- Base participation: 20 points per valid improvement proposal, proposer 30%, implementer 70%.
-- Case value points:
-  - Level IV: 60.
-  - Level III: 100.
-  - Level II: 200.
-  - Level I: 400.
-  - Distributed proposer 30%, implementer 70%.
-- Financial benefit:
-  - `R <= 2000`: `R * 1%`.
-  - `2000 < R <= 20000`: `20 + (R - 2000) * 2%`.
-  - `R > 20000`: `380 + (R - 20000) * 3%`.
-- Effective focus topics:
-  - Large: leader 7000, up to three core members at 1000 each.
-  - Medium: leader 2000, up to three core members at 500 each.
-  - Small: leader 300.
-- Excellent case sharing/publishing: 50 points per time, only for Level II or above.
-- Monthly department incentives:
-  - Rank 1: employee +10, supervisor +30.
-  - Rank 2: employee +5, supervisor +15.
+- 基础参与积分：有效改善提案每件 20 分，提出人 30%，实施人 70%。
+- 案例价值积分：
+  - 四级：60 分。
+  - 三级：100 分。
+  - 二级：200 分。
+  - 一级：400 分。
+  - 按提出人 30%、实施人 70% 分配。
+- 财务创效积分：
+  - `R <= 2000`：`R * 1%`。
+  - `2000 < R <= 20000`：`20 + (R - 2000) * 2%`。
+  - `R > 20000`：`380 + (R - 20000) * 3%`。
+- 有效焦点课题：
+  - 大型课题：组长 7000 分，核心组员最多 3 人，每人 1000 分。
+  - 中型课题：组长 2000 分，核心组员最多 3 人，每人 500 分。
+  - 小型课题：组长 300 分。
+- 优秀案例分享/发表：每次 50 分，仅限二级以上案例。
+- 月度部门激励：
+  - 第 1 名：员工 +10，主管 +30。
+  - 第 2 名：员工 +5，主管 +15。
 
-All points changes must create ledger entries. Manual adjustments require operator, reason, before/after state, and timestamp.
+所有积分变化必须生成积分流水。人工奖扣必须记录操作人、原因、变更前后状态和时间。
 
-## Redemption Workflow
+## 兑换流程
 
-Gift redemption must support:
+礼品兑换必须支持：
 
-- Gift catalog and gift detail.
-- Required points.
-- Reference value.
-- Stock quantity.
-- Reserved quantity.
-- Quarterly catalog version.
-- Redemption application.
-- Balance validation.
-- Stock validation.
-- Stock reservation on application.
-- Lean office/admin review.
-- Reject with reason and release reserved stock.
-- Approve and deduct points.
-- Issue registration.
-- Receipt status.
-- Redemption records and export/report views.
+- 礼品目录和礼品详情。
+- 所需积分。
+- 参考价值。
+- 库存数量。
+- 预占库存。
+- 季度目录版本。
+- 兑换申请。
+- 积分余额校验。
+- 库存校验。
+- 提交申请时预占库存。
+- 精益办/管理员审核。
+- 审核驳回必须填写原因，并释放预占库存。
+- 审核通过后扣减积分。
+- 发放登记。
+- 领取状态。
+- 兑换记录和导出/报表视图。
 
-## Organization And Data Import
+## 组织与数据导入
 
-Employee and department data are imported from Excel.
+员工和部门数据通过 Excel 导入。
 
-Employee import maps:
+员工导入映射：
 
-- `工号` to employee number and login account.
-- `姓名` to name.
-- `手机号` or employee number to phone/account fallback.
-- `2级部门` preferred, then `1级部门`.
-- `职位` to post.
-- `员工状态=离职` to disabled.
-- Other active statuses to active.
+- `工号` 映射为员工编号和登录账号。
+- `姓名` 映射为员工姓名。
+- `手机号` 或工号作为手机号/账号兜底。
+- 优先使用 `2级部门`，没有则使用 `1级部门`。
+- `职位` 映射为岗位。
+- `员工状态=离职` 映射为禁用。
+- 其他在职状态映射为可用账号。
 
-After import:
+导入后：
 
-- Missing departments are created.
-- Points accounts are created.
-- Initial password is `employeeNo + "@"`.
-- Review committee flags are resynced by name.
+- 缺失部门自动创建。
+- 自动创建积分账户。
+- 初始密码为 `employeeNo + "@"`。
+- 按姓名重新同步评审委员会标记。
 
-Mini-program administrators must be able to upload Excel files to the backend for import. The backend remains responsible for parsing and validation.
+小程序管理员必须能上传 Excel 文件给后端导入。Excel 解析和校验由后端负责。
 
-## Reports And Logs
+## 报表与日志
 
-Mini-program reports must include:
+小程序报表必须包括：
 
-- Proposal count by department.
-- Approved/rejected/pending proposal counts.
-- Points awarded by department.
-- Employee points ranking.
-- Redemption summary.
-- Gift stock summary.
+- 按部门统计提案数量。
+- 通过、驳回、待审提案数量。
+- 按部门统计已发积分。
+- 员工积分排行。
+- 兑换汇总。
+- 礼品库存汇总。
 
-Operation logs must include:
+操作日志必须包括：
 
-- Login.
-- Proposal create/update/delete/review.
-- Points adjustment.
-- Redemption review/issue.
-- Gift maintenance.
-- Import operations.
-- Annual clearing.
+- 登录。
+- 提案创建、编辑、删除、审批。
+- 积分调整。
+- 兑换审核和发放。
+- 礼品维护。
+- 导入操作。
+- 年度清零。
 
-Logs are admin-only and read-only in the mini-program.
+日志仅管理员可查看，并且在小程序中只读。
 
-## Notifications
+## 通知
 
-First phase uses in-app notifications:
+第一阶段使用站内通知：
 
-- Proposal submitted.
-- Review pending.
-- Review result.
-- Finance review result.
-- Committee approval result.
-- Points credited.
-- Redemption result.
-- Annual clearing reminder.
+- 提案已提交。
+- 待审批提醒。
+- 审批结果。
+- 财务复核结果。
+- 评审委员会核准结果。
+- 积分到账。
+- 兑换结果。
+- 年度清零提醒。
 
-WeChat subscription messages are deferred to a later phase because they require production AppID setup and user authorization flows.
+微信订阅消息暂不纳入本阶段，因为它依赖正式 AppID、线上配置和用户授权流程。
 
-## Technical Architecture
+## 技术架构
 
-Frontend:
+前端：
 
-- Native WeChat mini-program.
-- Role-aware pages and data filtering.
-- Uses backend token authentication.
-- Uses `wx.request` and `wx.uploadFile`.
+- 原生微信小程序。
+- 页面和入口按角色动态展示。
+- 使用后端 Token 鉴权。
+- 使用 `wx.request` 和 `wx.uploadFile`。
 
-Backend:
+后端：
 
-- Existing Node.js HTTP server evolves into the mini-program API backend.
-- Existing business rules and status machine are reused.
-- Add mobile-friendly endpoints where current endpoints are too coarse.
+- 现有 Node.js HTTP 服务演进为小程序 API 后端。
+- 复用现有业务规则和状态机。
+- 对当前过粗的接口补充移动端友好的接口。
 
-Data:
+数据：
 
-- Current JSON database is acceptable for prototype/demo.
-- Production should move to SQLite or MySQL before real company-wide use.
+- 当前 JSON 数据库仅适合原型和演示。
+- 正式全公司使用前建议迁移到 SQLite 或 MySQL。
 
-Files:
+文件：
 
-- Prototype can store uploads under local server upload directory.
-- Production should use controlled server storage or object storage.
+- 原型阶段可继续使用服务器本地上传目录。
+- 正式部署建议使用受控服务器文件目录或对象存储。
 
-Authentication:
+认证：
 
-- Current token mechanism remains for prototype.
-- Add token expiry, password change, and password reset before production.
+- 原型阶段继续使用当前 Token 机制。
+- 正式上线前增加 Token 过期、修改密码和密码重置。
 
-Deployment:
+部署：
 
-- Mini-program production requires HTTPS domain.
-- Server, domain, ICP filing, and SSL are customer responsibilities.
-- WeChat mini-program request domain must be configured in the official mini-program console.
+- 小程序正式环境必须使用 HTTPS 域名。
+- 服务器、域名、备案和 SSL 证书由客户负责。
+- 微信小程序后台必须配置合法 request/uploadFile 域名。
 
-## Current Implementation Gap
+## 当前实现差距
 
-Already available:
+已经具备：
 
-- Core backend proposal APIs.
-- Employee import.
-- Account/password rule.
-- Review committee flag.
-- Proposal base flow.
-- Points calculation.
-- Redemption base flow.
-- Mini-program skeleton pages.
+- 后端提案核心接口。
+- 员工导入。
+- 账号密码规则。
+- 评审委员会标记。
+- 提案基础流程。
+- 积分计算。
+- 兑换基础流程。
+- 小程序基础页面。
 
-Missing or incomplete:
+缺失或不完整：
 
-- Mini-program department evaluation form.
-- Mini-program finance review form.
-- Mini-program lean office review form.
-- Attachment/image/Excel upload from mini-program.
-- Mini-program organization import.
-- Mini-program gift maintenance.
-- Mini-program redemption review and issue.
-- Mini-program reports.
-- Mini-program operation logs.
-- Annual clearing task.
-- Password change.
-- Formal database migration.
-- Production deployment and WeChat domain setup.
+- 小程序端部门评估表单。
+- 小程序端财务复核表单。
+- 小程序端精益办复审表单。
+- 小程序端附件、图片、Excel 上传。
+- 小程序端组织导入。
+- 小程序端礼品维护。
+- 小程序端兑换审核和发放。
+- 小程序端报表。
+- 小程序端操作日志。
+- 年度清零任务。
+- 修改密码。
+- 正式数据库迁移。
+- 生产部署和微信合法域名配置。
 
-## Delivery Strategy
+## 交付策略
 
-Recommended implementation order:
+推荐实施顺序：
 
-1. Stabilize backend rules and authentication for mini-program use.
-2. Complete mini-program proposal workflow end to end.
-3. Complete points, redemption, and gift operations.
-4. Complete organization import and admin management.
-5. Complete reports, logs, annual clearing, and password management.
-6. Prepare production deployment requirements and WeChat release checklist.
+1. 稳定后端规则和小程序认证。
+2. 完成小程序提案流程端到端闭环。
+3. 完成积分、兑换和礼品运营。
+4. 完成组织导入和后台管理。
+5. 完成报表、日志、年度清零和密码管理。
+6. 准备生产部署要求和微信发布检查清单。
