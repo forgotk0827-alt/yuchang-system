@@ -535,7 +535,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, { attachments: saved });
     }
 
-    if (pathParts[1] === "attachments" && pathParts[2] && pathParts[3] === "download" && method === "GET") {
+    if (pathParts[1] === "attachments" && pathParts[2] && (!pathParts[3] || pathParts[3] === "download") && method === "GET") {
       let targetProposal = null;
       let targetAttachment = null;
       for (const proposal of db.proposals) {
@@ -1068,7 +1068,13 @@ async function handleApi(req, res, url) {
     }
 
     if (pathParts[1] === "import" && method === "POST") {
-      const type = pathParts[2];
+      const importTypeMap = {
+        users: "users",
+        employees: "users",
+        departments: "departments",
+        gifts: "gifts",
+      };
+      const type = importTypeMap[pathParts[2]];
       if (type === "users" || type === "departments") {
         if (!canAdmin(user)) return sendError(res, 403, "仅超级管理员可导入组织数据");
       } else if (type === "gifts") {

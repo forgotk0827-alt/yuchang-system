@@ -36,6 +36,65 @@ function requestJson(port, path, options = {}) {
   });
 }
 
+function requestRaw(port, path, options = {}) {
+  const body = options.body || Buffer.alloc(0);
+  const headers = Object.assign({}, options.headers || {});
+  if (body.length) headers["Content-Length"] = body.length;
+
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path,
+        method: options.method || "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            status: res.statusCode,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+      }
+    );
+    req.on("error", reject);
+    if (body.length) req.write(body);
+    req.end();
+  });
+}
+
+function buildMultipart(fields = {}, files = []) {
+  const boundary = `----CodexBoundary${Date.now().toString(16)}`;
+  const chunks = [];
+
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`));
+    chunks.push(Buffer.from(String(value)));
+    chunks.push(Buffer.from("\r\n"));
+  }
+
+  for (const file of files) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\n`));
+    chunks.push(Buffer.from(`Content-Type: ${file.contentType || "application/octet-stream"}\r\n\r\n`));
+    chunks.push(Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data));
+    chunks.push(Buffer.from("\r\n"));
+  }
+
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+
+  return {
+    body: Buffer.concat(chunks),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
 async function login(port, account, password) {
   const response = await requestJson(port, "/api/login", {
     method: "POST",
@@ -49,6 +108,8 @@ async function login(port, account, password) {
 
 module.exports = {
   requestJson,
+  requestRaw,
+  buildMultipart,
   login,
   createTempDbRoot,
   startServer,

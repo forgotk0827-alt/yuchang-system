@@ -1,0 +1,16 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">{{user.name}}</view>
+    <view class="subtle">{{user.employeeNo}} · {{user.role}}{{user.isReviewCommittee ? ' / 评审委员会' : ''}}</view>
+    <view class="subtle">部门：{{department}}</view>
+  </view>
+
+  <view class="panel stack">
+    <view class="title small-title">系统说明</view>
+    <view class="subtle">当前小程序端已支持登录、工作台、提案、积分、兑换和委员会核准，员工导入入口已可在小程序端直接使用。</view>
+  </view>
+
+  <button wx:if="{{canImport}}" class="btn" bindtap="openImport">员工导入</button>
+
+  <button class="btn btn-danger" bindtap="logout">退出登录</button>
+</view>

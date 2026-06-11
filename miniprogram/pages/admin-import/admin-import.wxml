@@ -1,0 +1,15 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">员工 Excel 导入</view>
+    <view class="subtle">支持 .xls、.xlsx、.csv。字段按职工名单模板识别工号、姓名、部门、职位和员工状态。</view>
+  </view>
+
+  <button class="btn" loading="{{loading}}" bindtap="chooseEmployeeFile">选择并导入文件</button>
+
+  <view wx:if="{{result}}" class="panel stack">
+    <view class="title small-title">导入结果</view>
+    <view class="subtle">新增：{{result.created || 0}}</view>
+    <view class="subtle">更新：{{result.updated || 0}}</view>
+    <view wx:if="{{result.errors && result.errors.length}}" class="subtle">错误：{{result.errors.join('；')}}</view>
+  </view>
+</view>

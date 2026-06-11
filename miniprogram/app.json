@@ -1,0 +1,35 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/dashboard/dashboard",
+    "pages/proposals/proposals",
+    "pages/proposal-form/proposal-form",
+    "pages/proposal-detail/proposal-detail",
+    "pages/points/points",
+    "pages/redemptions/redemptions",
+    "pages/profile/profile",
+    "pages/admin-import/admin-import"
+  ],
+  "window": {
+    "navigationBarTitleText": "煜昌改善提案",
+    "navigationBarBackgroundColor": "#0033A1",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F2F6FF",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#61707D",
+    "selectedColor": "#0033A1",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/dashboard/dashboard", "text": "工作台" },
+      { "pagePath": "pages/proposals/proposals", "text": "提案" },
+      { "pagePath": "pages/points/points", "text": "积分" },
+      { "pagePath": "pages/redemptions/redemptions", "text": "兑换" },
+      { "pagePath": "pages/profile/profile", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
