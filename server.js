@@ -39,6 +39,8 @@ const {
   canLean,
   canFinance,
   canCommittee,
+  validateNewPassword,
+  revokeOtherSessions,
 } = require("./src/auth");
 const {
   calculateProposalPoints,
@@ -496,6 +498,21 @@ async function handleApi(req, res, url) {
 
     if (url.pathname === "/api/me" && method === "GET") {
       return sendJson(res, { user: publicUser(user), department: departmentName(db, user.deptId), account: accountFor(db, user.id) });
+    }
+
+    if (url.pathname === "/api/change-password" && method === "POST") {
+      const body = await readBody(req);
+      const oldPassword = String(body.oldPassword || "");
+      const newPassword = String(body.newPassword || "");
+      if (user.passwordHash !== hashPassword(oldPassword)) return sendError(res, 400, "旧密码不正确");
+      const validationError = validateNewPassword(newPassword);
+      if (validationError) return sendError(res, 400, validationError);
+      const token = getToken(req);
+      user.passwordHash = hashPassword(newPassword);
+      revokeOtherSessions(db, user.id, token);
+      logOperation(db, user.id, "修改密码", "user", user.id, null, { changedAt: now() }, req);
+      saveDb(db);
+      return sendJson(res, { ok: true });
     }
 
     if (url.pathname === "/api/bootstrap" && method === "GET") {

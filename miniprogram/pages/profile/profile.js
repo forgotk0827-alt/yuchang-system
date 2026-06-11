@@ -37,6 +37,10 @@ Page({
     wx.navigateTo({ url: "/pages/admin/admin" });
   },
 
+  openChangePassword() {
+    wx.navigateTo({ url: "/pages/change-password/change-password" });
+  },
+
   async logout() {
     try {
       await request("/api/logout", { method: "POST" });

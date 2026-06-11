@@ -8,6 +8,7 @@
     "pages/points/points",
     "pages/redemptions/redemptions",
     "pages/profile/profile",
+    "pages/change-password/change-password",
     "pages/admin/admin",
     "pages/admin-users/admin-users",
     "pages/admin-reports/admin-reports",
