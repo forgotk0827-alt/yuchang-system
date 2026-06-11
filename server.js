@@ -785,7 +785,7 @@ async function handleApi(req, res, url) {
       const index = db.proposals.findIndex((item) => item.id === pathParts[2]);
       const proposal = db.proposals[index];
       if (!proposal || (proposal.submitterId !== user.id && !canAdmin(user))) return sendError(res, 404, "提案不存在");
-      if (proposal.status !== STATUS.DRAFT) return sendError(res, 400, "只能删除草稿状态的提案");
+      if (proposal.status !== STATUS.DRAFT) return sendError(res, 400, "只允许删除草稿");
       db.proposals.splice(index, 1);
       logOperation(db, user.id, "删除提案草稿", "proposal", proposal.id, proposal, null, req);
       saveDb(db);
@@ -811,7 +811,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, enrichProposal(db, proposal));
     }
 
-    if (pathParts[1] === "proposals" && pathParts[2] && pathParts[3] === "department-review" && method === "POST") {
+    if (pathParts[1] === "proposals" && pathParts[2] && ["department-review", "dept-review"].includes(pathParts[3]) && method === "POST") {
       const proposal = db.proposals.find((item) => item.id === pathParts[2]);
       if (!proposal) return sendError(res, 404, "提案不存在");
       if (!canDeptReview(user, proposal)) return sendError(res, 403, "无部门评估权限");
