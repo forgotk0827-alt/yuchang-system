@@ -49,6 +49,15 @@ const {
   resolveRewardLevel,
   requiresCommittee,
 } = require("./src/points");
+const {
+  REDEMPTION_STATUS,
+  createRedemption,
+  reviewRedemption,
+  issueRedemption,
+  listGifts,
+  listRedemptions,
+  upsertGift,
+} = require("./src/redemptions");
 
 function now() {
   return new Date().toISOString();
@@ -872,32 +881,21 @@ async function handleApi(req, res, url) {
     }
 
     if (url.pathname === "/api/gifts" && method === "GET") {
-      return sendJson(res, db.gifts);
+      return sendJson(res, listGifts(db));
     }
 
     if (url.pathname === "/api/gifts" && method === "POST") {
       if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无礼品维护权限");
       const body = await readBody(req);
       if (!body.name || !Number(body.requiredPoints)) return sendError(res, 400, "礼品名称和所需积分必填");
-      const gift = {
-        id: uid("g"),
-        name: String(body.name),
-        requiredPoints: Number(body.requiredPoints),
-        referenceValue: Number(body.referenceValue || 0),
-        stockQty: Number(body.stockQty || 0),
-        reservedQty: 0,
-        quarterVersion: String(body.quarterVersion || "未设置"),
-        status: String(body.status || "启用"),
-      };
-      db.gifts.unshift(gift);
+      const gift = upsertGift(db, body, { uid });
       logOperation(db, user.id, "新增礼品", "gift", gift.id, null, gift, req);
       saveDb(db);
       return sendJson(res, gift, 201);
     }
 
     if (url.pathname === "/api/redemptions" && method === "GET") {
-      let rows = db.redemptions;
-      if (!canAdmin(user) && !canLean(user)) rows = rows.filter((item) => item.userId === user.id);
+      const rows = listRedemptions(db, user, canAdmin(user) || canLean(user));
       return sendJson(res, rows.map((item) => ({
         ...item,
         userName: userName(db, item.userId),
@@ -908,94 +906,56 @@ async function handleApi(req, res, url) {
 
     if (url.pathname === "/api/redemptions" && method === "POST") {
       const body = await readBody(req);
-      const gift = db.gifts.find((item) => item.id === body.giftId && item.status === "启用");
-      if (!gift) return sendError(res, 404, "礼品不存在或未启用");
-      const quantity = Math.max(1, Number(body.quantity || 1));
-      const availableStock = gift.stockQty - gift.reservedQty;
-      if (availableStock < quantity) return sendError(res, 400, "库存不足");
-      const required = gift.requiredPoints * quantity;
-      const account = accountFor(db, user.id);
-      if (account.balance - account.reserved < required) return sendError(res, 400, "可用积分不足");
-      account.reserved += required;
-      gift.reservedQty += quantity;
-      const redemption = {
-        id: uid("rd"),
-        userId: user.id,
-        giftId: gift.id,
-        points: required,
-        quantity,
-        status: "待审核",
-        receiveStatus: "未发放",
-        remark: String(body.remark || ""),
-        createdAt: now(),
-        updatedAt: now(),
-      };
-      db.redemptions.unshift(redemption);
-      notify(db, user.id, "兑换申请", "兑换申请已提交", `礼品“${gift.name}”已预占 ${required} 积分，等待审核。`);
-      logOperation(db, user.id, "提交兑换申请", "redemption", redemption.id, null, redemption, req);
+      let redemption;
+      try {
+        redemption = createRedemption(db, user, body, {
+          accountFor,
+          now,
+          uid,
+          notify,
+          logOperation: (innerDb, operatorId, action, objectType, objectId, before, after) =>
+            logOperation(innerDb, operatorId, action, objectType, objectId, before, after, req),
+        });
+      } catch (err) {
+        return sendError(res, err.message === "礼品不存在或未启用" ? 404 : 400, err.message);
+      }
       saveDb(db);
       return sendJson(res, redemption, 201);
     }
 
     if (pathParts[1] === "redemptions" && pathParts[2] && pathParts[3] === "review" && method === "POST") {
       if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无兑换审核权限");
-      const redemption = db.redemptions.find((item) => item.id === pathParts[2]);
-      if (!redemption) return sendError(res, 404, "兑换记录不存在");
-      if (redemption.status !== "待审核") return sendError(res, 400, "当前状态不可审核");
       const body = await readBody(req);
-      const gift = db.gifts.find((item) => item.id === redemption.giftId);
-      const account = accountFor(db, redemption.userId);
-      const before = { ...redemption };
-      if (body.result === "reject") {
-        account.reserved -= redemption.points;
-        if (gift) gift.reservedQty -= redemption.quantity;
-        redemption.status = "已驳回";
-        redemption.reviewOpinion = String(body.opinion || "不通过");
-        addLedger(db, redemption.userId, POINT_TYPES.REDEEM_RELEASE, 0, "redemption", redemption.id, "兑换驳回释放预占积分", user.id);
-      } else {
-        account.reserved -= redemption.points;
-        account.balance -= redemption.points;
-        account.totalDeducted += redemption.points;
-        if (gift) {
-          gift.reservedQty -= redemption.quantity;
-          gift.stockQty -= redemption.quantity;
-        }
-        db.pointsLedger.unshift({
-          id: uid("pl"),
-          userId: redemption.userId,
-          type: POINT_TYPES.REDEEM_DEDUCT,
-          points: -redemption.points,
-          sourceType: "redemption",
-          sourceId: redemption.id,
-          balanceAfter: account.balance,
-          remark: "兑换审核通过扣减积分",
-          operatorId: user.id,
-          createdAt: now(),
+      let redemption;
+      try {
+        redemption = reviewRedemption(db, user, pathParts[2], body, {
+          accountFor,
+          now,
+          addLedger,
+          notify,
+          logOperation: (innerDb, operatorId, action, objectType, objectId, before, after) =>
+            logOperation(innerDb, operatorId, action, objectType, objectId, before, after, req),
         });
-        redemption.status = "审核通过";
-        redemption.receiveStatus = "待发放";
+      } catch (err) {
+        return sendError(res, err.message === "兑换记录不存在" ? 404 : 400, err.message);
       }
-      redemption.reviewerId = user.id;
-      redemption.reviewedAt = now();
-      redemption.updatedAt = now();
-      notify(db, redemption.userId, "兑换审核结果", `兑换${redemption.status}`, body.result === "reject" ? redemption.reviewOpinion : "兑换审核通过，等待发放。");
-      logOperation(db, user.id, "兑换审核", "redemption", redemption.id, before, redemption, req);
       saveDb(db);
       return sendJson(res, redemption);
     }
 
     if (pathParts[1] === "redemptions" && pathParts[2] && pathParts[3] === "issue" && method === "POST") {
       if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无礼品发放权限");
-      const redemption = db.redemptions.find((item) => item.id === pathParts[2]);
-      if (!redemption) return sendError(res, 404, "兑换记录不存在");
-      if (redemption.status !== "审核通过") return sendError(res, 400, "当前状态不可发放");
-      const before = { ...redemption };
-      redemption.receiveStatus = "已发放";
-      redemption.issuedAt = now();
-      redemption.issuerId = user.id;
-      redemption.updatedAt = now();
-      notify(db, redemption.userId, "礼品发放", "兑换礼品已发放", "请按通知领取礼品。");
-      logOperation(db, user.id, "礼品发放确认", "redemption", redemption.id, before, redemption, req);
+      let redemption;
+      try {
+        redemption = issueRedemption(db, user, pathParts[2], {
+          now,
+          notify,
+          logOperation: (innerDb, operatorId, action, objectType, objectId, before, after) =>
+            logOperation(innerDb, operatorId, action, objectType, objectId, before, after, req),
+        });
+      } catch (err) {
+        return sendError(res, err.message === "兑换记录不存在" ? 404 : 400, err.message);
+      }
       saveDb(db);
       return sendJson(res, redemption);
     }
