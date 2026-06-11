@@ -4,45 +4,30 @@ const path = require("path");
 const crypto = require("crypto");
 const XLSX = require("xlsx");
 const { URL } = require("url");
-
-const PORT = Number(process.env.PORT || 3000);
-const ROOT = __dirname;
-const PUBLIC_DIR = path.join(ROOT, "public");
-const DATA_DIR = path.join(ROOT, "data");
-const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const DB_PATH = path.join(DATA_DIR, "db.json");
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
-const ALLOWED_UPLOAD_EXT = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".txt"]);
-
-const ROLES = {
-  EMPLOYEE: "普通员工",
-  DEPT_REVIEWER: "部门初审",
-  FINANCE: "财务复核",
-  LEAN_OFFICE: "精益办复审",
-  ADMIN: "超级管理员",
-};
-
-const STATUS = {
-  DRAFT: "草稿",
-  DEPT_PENDING: "待部门初审",
-  DEPT_REJECTED: "部门初审驳回",
-  FINANCE_PENDING: "待财务复核",
-  FINANCE_REJECTED: "财务复核驳回",
-  LEAN_PENDING: "待精益办复审",
-  LEAN_REJECTED: "精益办复审驳回",
-  APPROVED: "复审通过",
-  ARCHIVED: "已归档",
-};
-
-const POINT_TYPES = {
-  PROPOSAL: "提案通过发分",
-  MANUAL_ADD: "人工奖励",
-  MANUAL_DEDUCT: "人工扣减",
-  REDEEM_RESERVE: "兑换预占",
-  REDEEM_RELEASE: "兑换释放",
-  REDEEM_DEDUCT: "兑换扣减",
-  ANNUAL_CLEAR: "年度清零",
-};
+const {
+  PORT,
+  DATA_DIR,
+  UPLOAD_DIR,
+  DB_PATH,
+  MAX_UPLOAD_SIZE,
+  ALLOWED_UPLOAD_EXT,
+  ROLES,
+  STATUS,
+  PROPOSAL_EVALUATION_TYPES,
+  PROPOSAL_LEVELS,
+  PROJECT_TYPES,
+  DEFAULT_REVIEW_COMMITTEE_NAMES,
+  FOCUS_TOPIC_SCALES,
+  POINT_TYPES,
+} = require("./src/config");
+const {
+  sendJson,
+  sendError,
+  readBody,
+  readBuffer,
+  parseMultipart,
+  serveStatic,
+} = require("./src/http");
 
 function now() {
   return new Date().toISOString();
@@ -83,14 +68,14 @@ function defaultGifts() {
 
 function seedDb() {
   const users = [
-    { id: "u_admin", employeeNo: "A001", name: "系统管理员", phone: "13800000001", deptId: "d_lean", post: "管理员", role: ROLES.ADMIN, passwordHash: hashPassword("123456"), status: "在职" },
-    { id: "u_emp", employeeNo: "E001", name: "张三", phone: "13800000002", deptId: "d_prod", post: "操作员", role: ROLES.EMPLOYEE, passwordHash: hashPassword("123456"), status: "在职" },
-    { id: "u_dept", employeeNo: "D001", name: "李主管", phone: "13800000003", deptId: "d_prod", post: "部门主管", role: ROLES.DEPT_REVIEWER, passwordHash: hashPassword("123456"), status: "在职" },
-    { id: "u_finance", employeeNo: "F001", name: "王财务", phone: "13800000004", deptId: "d_finance", post: "财务", role: ROLES.FINANCE, passwordHash: hashPassword("123456"), status: "在职" },
-    { id: "u_lean", employeeNo: "L001", name: "赵精益", phone: "13800000005", deptId: "d_lean", post: "精益专员", role: ROLES.LEAN_OFFICE, passwordHash: hashPassword("123456"), status: "在职" },
+    { id: "u_admin", employeeNo: "A001", name: "系统管理员", phone: "13800000001", deptId: "d_lean", post: "管理员", role: ROLES.ADMIN, passwordHash: hashPassword("A001@"), status: "在职" },
+    { id: "u_emp", employeeNo: "E001", name: "张三", phone: "13800000002", deptId: "d_prod", post: "操作员", role: ROLES.EMPLOYEE, passwordHash: hashPassword("E001@"), status: "在职" },
+    { id: "u_dept", employeeNo: "D001", name: "李主管", phone: "13800000003", deptId: "d_prod", post: "部门主管", role: ROLES.DEPT_REVIEWER, passwordHash: hashPassword("D001@"), status: "在职" },
+    { id: "u_finance", employeeNo: "F001", name: "王财务", phone: "13800000004", deptId: "d_finance", post: "财务", role: ROLES.FINANCE, passwordHash: hashPassword("F001@"), status: "在职" },
+    { id: "u_lean", employeeNo: "L001", name: "赵精益", phone: "13800000005", deptId: "d_lean", post: "精益专员", role: ROLES.LEAN_OFFICE, passwordHash: hashPassword("L001@"), status: "在职" },
   ];
   return {
-    meta: { createdAt: now(), nextProposalNo: 2 },
+    meta: { createdAt: now(), nextProposalNo: 2, reviewCommitteeNames: DEFAULT_REVIEW_COMMITTEE_NAMES },
     sessions: {},
     departments: [
       { id: "d_prod", name: "生产部", parentId: "", leaderId: "u_dept", status: "启用" },
@@ -105,12 +90,24 @@ function seedDb() {
         title: "注塑换模工具定置改善",
         category: "效率提升",
         benefitType: "非财务创效",
+        projectType: "普通改善提案",
+        focusTopicScale: "",
         background: "现场换模工具取用路径长，换模准备时间偏长。",
         content: "通过工具定置、标识优化和点检表标准化缩短准备时间。",
         measures: "制作定置板，明确工具编号，设置每日点检。",
         expectedBenefit: "预计单次换模缩短 5 分钟。",
         actualBenefit: "试运行后单次换模平均缩短 6 分钟。",
         level: "四级",
+        originalLevel: "四级",
+        rewardLevel: "四级",
+        evaluationType: "正常改善",
+        isHorizontalExpansion: false,
+        siteConfirmed: true,
+        siteConfirmedBy: "u_dept",
+        siteConfirmedAt: now(),
+        siteConfirmNote: "现场已确认实施效果。",
+        committeeRequired: false,
+        committeeStatus: "",
         status: STATUS.LEAN_PENDING,
         submitterId: "u_emp",
         deptId: "d_prod",
@@ -120,7 +117,7 @@ function seedDb() {
         updatedAt: now(),
         submittedAt: now(),
         approvals: [
-          { node: "部门初审", approverId: "u_dept", result: "通过", opinion: "属实，建议复审。", at: now() },
+          { node: "部门评估组初评", approverId: "u_dept", result: "通过", opinion: "属实，建议复审。", at: now() },
         ],
       },
     ],
@@ -152,6 +149,8 @@ function loadDb() {
     return db;
   }
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  migrateDb(db);
+  syncReviewCommittee(db);
   syncDefaultGifts(db);
   return db;
 }
@@ -172,92 +171,47 @@ function syncDefaultGifts(db) {
   saveDb(db);
 }
 
+function migrateDb(db) {
+  db.meta ||= {};
+  db.meta.reviewCommitteeNames ||= DEFAULT_REVIEW_COMMITTEE_NAMES;
+  const statusMap = {
+    "待部门初审": STATUS.DEPT_PENDING,
+    "部门初审驳回": STATUS.DEPT_REJECTED,
+  };
+  (db.proposals || []).forEach((proposal) => {
+    if (statusMap[proposal.status]) proposal.status = statusMap[proposal.status];
+    proposal.evaluationType ||= "正常改善";
+    proposal.projectType = PROJECT_TYPES.includes(proposal.projectType) ? proposal.projectType : "普通改善提案";
+    proposal.focusTopicScale = FOCUS_TOPIC_SCALES[proposal.focusTopicScale] ? proposal.focusTopicScale : "";
+    proposal.originalLevel ||= proposal.level || "四级";
+    proposal.isHorizontalExpansion = Boolean(proposal.isHorizontalExpansion);
+    proposal.rewardLevel ||= resolveRewardLevel(proposal.originalLevel, proposal.isHorizontalExpansion);
+    proposal.siteConfirmed = Boolean(proposal.siteConfirmed);
+    proposal.siteConfirmedBy ||= "";
+    proposal.siteConfirmedAt ||= "";
+    proposal.siteConfirmNote ||= "";
+    proposal.committeeRequired = Boolean(proposal.committeeRequired);
+    proposal.committeeStatus ||= "";
+    (proposal.approvals || []).forEach((approval) => {
+      if (approval.node === "部门初审") approval.node = "部门评估组初评";
+    });
+  });
+  (db.users || []).forEach((user) => {
+    if (user.role === "部门初审") user.role = ROLES.DEPT_REVIEWER;
+  });
+}
+
+function syncReviewCommittee(db) {
+  const names = db.meta?.reviewCommitteeNames?.length ? db.meta.reviewCommitteeNames : DEFAULT_REVIEW_COMMITTEE_NAMES;
+  (db.users || []).forEach((user) => {
+    user.isReviewCommittee = names.includes(user.name);
+  });
+}
+
 function publicUser(user) {
   if (!user) return null;
   const { passwordHash, ...rest } = user;
   return rest;
-}
-
-function send(res, status, body, headers = {}) {
-  const payload = typeof body === "string" ? body : JSON.stringify(body);
-  res.writeHead(status, {
-    "Content-Type": typeof body === "string" ? "text/plain; charset=utf-8" : "application/json; charset=utf-8",
-    ...headers,
-  });
-  res.end(payload);
-}
-
-function sendJson(res, body, status = 200) {
-  send(res, status, body);
-}
-
-function sendError(res, status, message) {
-  sendJson(res, { error: message }, status);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 2 * 1024 * 1024) {
-        reject(new Error("请求体过大"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      if (!data) return resolve({});
-      try {
-        resolve(JSON.parse(data));
-      } catch (err) {
-        reject(new Error("JSON 格式错误"));
-      }
-    });
-  });
-}
-
-function readBuffer(req, maxBytes = MAX_UPLOAD_SIZE) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > maxBytes) {
-        reject(new Error("文件过大，单次上传不能超过 10MB"));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => resolve(Buffer.concat(chunks)));
-    req.on("error", reject);
-  });
-}
-
-function parseMultipart(req, buffer) {
-  const contentType = req.headers["content-type"] || "";
-  const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
-  if (!match) throw new Error("缺少 multipart boundary");
-  const boundary = `--${match[1] || match[2]}`;
-  const body = buffer.toString("binary");
-  const parts = body.split(boundary).slice(1, -1);
-  return parts.map((part) => {
-    const clean = part.replace(/^\r\n/, "").replace(/\r\n$/, "");
-    const splitIndex = clean.indexOf("\r\n\r\n");
-    if (splitIndex === -1) return null;
-    const rawHeaders = clean.slice(0, splitIndex);
-    const content = clean.slice(splitIndex + 4);
-    const disposition = rawHeaders.match(/content-disposition:\s*form-data;\s*([^\r\n]+)/i)?.[1] || "";
-    const name = disposition.match(/name="([^"]+)"/)?.[1] || "";
-    const filename = disposition.match(/filename="([^"]*)"/)?.[1] || "";
-    const type = rawHeaders.match(/content-type:\s*([^\r\n]+)/i)?.[1] || "application/octet-stream";
-    return {
-      name,
-      filename,
-      type,
-      data: Buffer.from(content, "binary"),
-    };
-  }).filter(Boolean);
 }
 
 function safeFileName(filename) {
@@ -409,6 +363,10 @@ function canFinance(user) {
   return user.role === ROLES.FINANCE || canAdmin(user);
 }
 
+function canCommittee(user) {
+  return Boolean(user.isReviewCommittee) || canLean(user);
+}
+
 function canDeptReview(user, proposal) {
   return canAdmin(user) || user.role === ROLES.DEPT_REVIEWER && user.deptId === proposal.deptId;
 }
@@ -474,36 +432,125 @@ function addLedger(db, userId, type, points, sourceType, sourceId, remark, opera
 }
 
 function calculateProposalPoints(proposal) {
+  return calculateProposalPointBreakdown(proposal).total;
+}
+
+function levelIndex(level) {
+  return PROPOSAL_LEVELS.indexOf(level);
+}
+
+function downgradeLevel(level) {
+  const index = levelIndex(level);
+  return index > 0 ? PROPOSAL_LEVELS[index - 1] : "四级";
+}
+
+function resolveRewardLevel(originalLevel, isHorizontalExpansion) {
+  const level = PROPOSAL_LEVELS.includes(originalLevel) ? originalLevel : "四级";
+  return isHorizontalExpansion ? downgradeLevel(level) : level;
+}
+
+function requiresCommittee(level) {
+  return ["二级", "一级"].includes(level);
+}
+
+function calculateProposalPointBreakdown(proposal) {
+  if (proposal.projectType === "有效焦点课题") {
+    const scale = FOCUS_TOPIC_SCALES[proposal.focusTopicScale] || FOCUS_TOPIC_SCALES.small;
+    const coreCount = (proposal.participants || []).filter((participant) => participant.role === "核心组员").slice(0, scale.maxCoreMembers).length;
+    const items = [
+      { type: "有效焦点课题", project: `${scale.label} / 课题组长奖励`, points: scale.leaderPoints, distributionMode: "focus_leader" },
+    ];
+    if (scale.corePoints > 0 && coreCount > 0) {
+      items.push({ type: "有效焦点课题", project: `${scale.label} / 核心组员奖励（最多${scale.maxCoreMembers}人）`, points: scale.corePoints * coreCount, distributionMode: "focus_core" });
+    }
+    return { items, total: items.reduce((sum, item) => sum + item.points, 0) };
+  }
   const base = 20;
   const levelMap = { "四级": 60, "三级": 100, "二级": 200, "一级": 400 };
-  let points = base + (levelMap[proposal.level] || 0);
+  if (proposal.evaluationType && proposal.evaluationType !== "正常改善") {
+    return {
+      items: [{ type: "判定结果", project: `${proposal.evaluationType}类项目不纳入改善提案积分`, points: 0, distributionMode: "none" }],
+      total: 0,
+    };
+  }
+  const rewardLevel = proposal.rewardLevel || proposal.level;
+  const items = [
+    { type: "基础参与积分", project: "有效改善提案", points: base, distributionMode: "participant_ratio" },
+  ];
+  const levelPoints = levelMap[rewardLevel] || 0;
+  if (levelPoints > 0) {
+    const project = proposal.isHorizontalExpansion
+      ? `水平展开项目：原评${proposal.originalLevel || proposal.level}，奖励按${rewardLevel}`
+      : `提案实施效果评级：${rewardLevel}`;
+    items.push({ type: "案例价值积分", project, points: levelPoints, distributionMode: "participant_ratio" });
+  }
   const amount = Number(proposal.financeAmount || 0);
   if (proposal.benefitType === "财务创效" && amount > 0) {
-    if (amount <= 2000) points += Math.round(amount * 0.01);
-    else if (amount <= 20000) points += Math.round(20 + (amount - 2000) * 0.02);
-    else points += Math.round(380 + (amount - 20000) * 0.03);
+    let financePoints;
+    if (amount <= 2000) financePoints = Math.round(amount * 0.01);
+    else if (amount <= 20000) financePoints = Math.round(20 + (amount - 2000) * 0.02);
+    else financePoints = Math.round(380 + (amount - 20000) * 0.03);
+    items.push({ type: "专项激励积分", project: "财务创效奖励", points: financePoints, distributionMode: "leader_allocated" });
   }
-  return points;
+  return { items, total: items.reduce((sum, item) => sum + item.points, 0) };
+}
+
+function aggregateDistribution(points, participants) {
+  const rows = participants?.length ? participants : [];
+  if (!rows.length) return [];
+  const allocations = new Map();
+  let distributed = 0;
+  rows.forEach((participant, index) => {
+    const isLast = index === rows.length - 1;
+    const share = isLast ? points - distributed : Math.round(points * Number(participant.ratio || 0) / 100);
+    distributed += share;
+    if (share <= 0) return;
+    const current = allocations.get(participant.userId) || { userId: participant.userId, points: 0, roles: [] };
+    current.points += share;
+    current.roles.push(participant.role);
+    allocations.set(participant.userId, current);
+  });
+  return Array.from(allocations.values());
+}
+
+function focusTopicDistribution(item, proposal) {
+  const scale = FOCUS_TOPIC_SCALES[proposal.focusTopicScale] || FOCUS_TOPIC_SCALES.small;
+  const participants = proposal.participants || [];
+  const leader = participants.find((participant) => participant.role === "课题组长") || { userId: proposal.submitterId, role: "课题组长" };
+  if (item.distributionMode === "focus_leader") {
+    return [{ userId: leader.userId, points: scale.leaderPoints, roles: ["课题组长"] }];
+  }
+  const cores = participants.filter((participant) => participant.role === "核心组员" && participant.userId !== leader.userId).slice(0, scale.maxCoreMembers);
+  return cores.map((participant) => ({ userId: participant.userId, points: scale.corePoints, roles: ["核心组员"] }));
 }
 
 function distributeProposalPoints(db, proposal, operatorId) {
-  const total = calculateProposalPoints(proposal);
-  const participants = proposal.participants?.length ? proposal.participants : [{ userId: proposal.submitterId, role: "提出人", ratio: 100 }];
-  let distributed = 0;
-  participants.forEach((participant, index) => {
-    const isLast = index === participants.length - 1;
-    const points = isLast ? total - distributed : Math.round(total * Number(participant.ratio || 0) / 100);
-    distributed += points;
-    if (points > 0) {
-      addLedger(db, participant.userId, POINT_TYPES.PROPOSAL, points, "proposal", proposal.id, `${proposal.proposalNo} ${proposal.title} ${participant.role}`, operatorId);
-      notify(db, participant.userId, "积分到账", "改善提案积分到账", `提案“${proposal.title}”通过复审，到账 ${points} 分。`);
+  const breakdown = calculateProposalPointBreakdown(proposal);
+  const participantDistribution = proposal.participants?.length ? proposal.participants : [{ userId: proposal.submitterId, role: "提出人", ratio: 100 }];
+  breakdown.items.forEach((item) => {
+    if (item.distributionMode?.startsWith("focus_")) {
+      focusTopicDistribution(item, proposal).forEach((allocation) => {
+        if (allocation.points <= 0) return;
+        addLedger(db, allocation.userId, POINT_TYPES.PROPOSAL, allocation.points, "proposal", proposal.id, `${proposal.proposalNo} ${proposal.title} ${item.type}/${item.project} ${allocation.roles.join("、")}`, operatorId);
+        notify(db, allocation.userId, "积分到账", "有效焦点课题积分到账", `课题“${proposal.title}”${item.project}到账 ${allocation.points} 分。`);
+      });
+      return;
     }
+    const distribution = item.distributionMode === "leader_allocated" && proposal.financeDistribution?.length
+      ? proposal.financeDistribution
+      : participantDistribution;
+    aggregateDistribution(item.points, distribution).forEach((allocation) => {
+      addLedger(db, allocation.userId, POINT_TYPES.PROPOSAL, allocation.points, "proposal", proposal.id, `${proposal.proposalNo} ${proposal.title} ${item.type}/${item.project} ${allocation.roles.join("、")}`, operatorId);
+      notify(db, allocation.userId, "积分到账", "改善提案积分到账", `提案“${proposal.title}”${item.project}到账 ${allocation.points} 分。`);
+    });
   });
-  proposal.awardedPoints = total;
+  proposal.awardedPoints = breakdown.total;
+  proposal.pointsBreakdown = breakdown.items;
 }
 
 function visibleProposals(db, user) {
   if (canAdmin(user) || user.role === ROLES.LEAN_OFFICE || user.role === ROLES.FINANCE) return db.proposals;
+  if (user.isReviewCommittee) return db.proposals.filter((item) => item.status === STATUS.COMMITTEE_PENDING || item.submitterId === user.id || item.participants?.some((participant) => participant.userId === user.id));
   if (user.role === ROLES.DEPT_REVIEWER) return db.proposals.filter((item) => item.deptId === user.deptId || item.submitterId === user.id);
   return db.proposals.filter((item) => item.submitterId === user.id || item.participants?.some((participant) => participant.userId === user.id));
 }
@@ -513,8 +560,9 @@ function enrichProposal(db, proposal) {
     ...proposal,
     submitterName: userName(db, proposal.submitterId),
     deptName: departmentName(db, proposal.deptId),
-    participantNames: (proposal.participants || []).map((p) => `${userName(db, p.userId)}(${p.role}/${p.ratio}%)`).join("、"),
+    participantNames: (proposal.participants || []).map((p) => proposal.projectType === "有效焦点课题" ? `${userName(db, p.userId)}(${p.role})` : `${userName(db, p.userId)}(${p.role}/${p.ratio}%)`).join("、"),
     estimatedPoints: calculateProposalPoints(proposal),
+    pointsBreakdown: proposal.pointsBreakdown || calculateProposalPointBreakdown(proposal).items,
   };
 }
 
@@ -527,28 +575,58 @@ function canAttachProposal(db, user, proposal) {
   return canAdmin(user) || canLean(user) || canFinance(user) || canDeptReview(user, proposal) || proposal.submitterId === user.id;
 }
 
+function proposalInputFromBody(user, body) {
+  const requestedProjectType = PROJECT_TYPES.includes(body.projectType) ? String(body.projectType) : "普通改善提案";
+  if (requestedProjectType === "有效焦点课题" && !canLean(user)) {
+    const error = new Error("有效焦点课题需由精益办或管理员认定");
+    error.status = 403;
+    throw error;
+  }
+  const projectType = requestedProjectType;
+  const focusTopicScale = projectType === "有效焦点课题" && FOCUS_TOPIC_SCALES[body.focusTopicScale] ? String(body.focusTopicScale) : "";
+  const participants = body.participants?.length ? body.participants : [{ userId: user.id, role: "提出人", ratio: 30 }, { userId: user.id, role: "实施人", ratio: 70 }];
+  if (projectType === "有效焦点课题") {
+    if (!participants.some((participant) => participant.role === "课题组长")) {
+      const error = new Error("有效焦点课题必须指定课题组长");
+      error.status = 400;
+      throw error;
+    }
+    const scale = FOCUS_TOPIC_SCALES[focusTopicScale] || FOCUS_TOPIC_SCALES.small;
+    const coreCount = participants.filter((participant) => participant.role === "核心组员").length;
+    if (coreCount > scale.maxCoreMembers) {
+      const error = new Error(`${scale.label}核心组员最多${scale.maxCoreMembers}人`);
+      error.status = 400;
+      throw error;
+    }
+  }
+  const level = String(body.level || "四级");
+  const isHorizontalExpansion = body.isHorizontalExpansion === true || body.isHorizontalExpansion === "on" || body.isHorizontalExpansion === "true";
+  return {
+    title: String(body.title),
+    category: String(body.category || "效率提升"),
+    benefitType: String(body.benefitType || "非财务创效"),
+    projectType,
+    focusTopicScale,
+    financeAmount: Number(body.financeAmount || 0),
+    background: String(body.background),
+    content: String(body.content),
+    measures: String(body.measures),
+    expectedBenefit: String(body.expectedBenefit || ""),
+    actualBenefit: String(body.actualBenefit || ""),
+    level,
+    originalLevel: level,
+    rewardLevel: resolveRewardLevel(level, isHorizontalExpansion),
+    evaluationType: PROPOSAL_EVALUATION_TYPES.includes(body.evaluationType) ? String(body.evaluationType) : "正常改善",
+    isHorizontalExpansion,
+    participants,
+  };
+}
+
 function toCsv(rows) {
   return rows.map((row) => row.map((value) => {
     const str = String(value ?? "");
     return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
   }).join(",")).join("\n");
-}
-
-function serveStatic(req, res, pathname) {
-  let filePath = pathname === "/" ? path.join(PUBLIC_DIR, "index.html") : path.join(PUBLIC_DIR, pathname);
-  if (!filePath.startsWith(PUBLIC_DIR)) return sendError(res, 403, "禁止访问");
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    filePath = path.join(PUBLIC_DIR, "index.html");
-  }
-  const ext = path.extname(filePath).toLowerCase();
-  const type = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".svg": "image/svg+xml",
-  }[ext] || "application/octet-stream";
-  res.writeHead(200, { "Content-Type": type });
-  fs.createReadStream(filePath).pipe(res);
 }
 
 async function handleApi(req, res, url) {
@@ -592,6 +670,7 @@ async function handleApi(req, res, url) {
         gifts: db.gifts,
         roles: Object.values(ROLES),
         statuses: Object.values(STATUS),
+        reviewCommitteeNames: db.meta.reviewCommitteeNames || DEFAULT_REVIEW_COMMITTEE_NAMES,
       });
     }
 
@@ -657,8 +736,9 @@ async function handleApi(req, res, url) {
       const pending = proposals.filter((item) => {
         if (user.role === ROLES.DEPT_REVIEWER) return item.status === STATUS.DEPT_PENDING && item.deptId === user.deptId;
         if (user.role === ROLES.FINANCE) return item.status === STATUS.FINANCE_PENDING;
-        if (user.role === ROLES.LEAN_OFFICE) return item.status === STATUS.LEAN_PENDING;
-        if (canAdmin(user)) return [STATUS.DEPT_PENDING, STATUS.FINANCE_PENDING, STATUS.LEAN_PENDING].includes(item.status);
+        if (user.role === ROLES.LEAN_OFFICE) return [STATUS.LEAN_PENDING, STATUS.COMMITTEE_PENDING].includes(item.status);
+        if (user.isReviewCommittee) return item.status === STATUS.COMMITTEE_PENDING;
+        if (canAdmin(user)) return [STATUS.DEPT_PENDING, STATUS.FINANCE_PENDING, STATUS.LEAN_PENDING, STATUS.COMMITTEE_PENDING].includes(item.status);
         return false;
       }).length;
       return sendJson(res, {
@@ -686,23 +766,25 @@ async function handleApi(req, res, url) {
       const body = await readBody(req);
       const asDraft = body.action === "draft";
       if (!body.title || !body.background || !body.content || !body.measures) return sendError(res, 400, "标题、背景、内容和措施为必填");
+      let input;
+      try {
+        input = proposalInputFromBody(user, body);
+      } catch (err) {
+        return sendError(res, err.status || 400, err.message);
+      }
       const proposal = {
         id: uid("p"),
         proposalNo: `YC-2026-${String(db.meta.nextProposalNo++).padStart(4, "0")}`,
-        title: String(body.title),
-        category: String(body.category || "效率提升"),
-        benefitType: String(body.benefitType || "非财务创效"),
-        financeAmount: Number(body.financeAmount || 0),
-        background: String(body.background),
-        content: String(body.content),
-        measures: String(body.measures),
-        expectedBenefit: String(body.expectedBenefit || ""),
-        actualBenefit: String(body.actualBenefit || ""),
-        level: String(body.level || "四级"),
+        ...input,
+        siteConfirmed: false,
+        siteConfirmedBy: "",
+        siteConfirmedAt: "",
+        siteConfirmNote: "",
+        committeeRequired: false,
+        committeeStatus: "",
         status: asDraft ? STATUS.DRAFT : STATUS.DEPT_PENDING,
         submitterId: user.id,
         deptId: user.deptId,
-        participants: body.participants?.length ? body.participants : [{ userId: user.id, role: "提出人", ratio: 30 }, { userId: user.id, role: "实施人", ratio: 70 }],
         attachments: [],
         approvals: [],
         createdAt: now(),
@@ -711,11 +793,47 @@ async function handleApi(req, res, url) {
       };
       db.proposals.unshift(proposal);
       db.users.filter((item) => item.role === ROLES.DEPT_REVIEWER && item.deptId === user.deptId).forEach((reviewer) => {
-        notify(db, reviewer.id, "部门初审待办", "新的改善提案待初审", `${user.name} 提交了“${proposal.title}”。`);
+        notify(db, reviewer.id, "部门评估待办", "新的改善提案待初评", `${user.name} 提交了“${proposal.title}”。`);
       });
       logOperation(db, user.id, asDraft ? "保存提案草稿" : "提交提案", "proposal", proposal.id, null, proposal, req);
       saveDb(db);
       return sendJson(res, enrichProposal(db, proposal), 201);
+    }
+
+    if (pathParts[1] === "proposals" && pathParts[2] && method === "PUT") {
+      const proposal = db.proposals.find((item) => item.id === pathParts[2]);
+      if (!proposal || (proposal.submitterId !== user.id && !canAdmin(user))) return sendError(res, 404, "提案不存在");
+      if (![STATUS.DRAFT, STATUS.DEPT_REJECTED, STATUS.FINANCE_REJECTED, STATUS.LEAN_REJECTED, STATUS.COMMITTEE_REJECTED].includes(proposal.status)) return sendError(res, 400, "当前状态不可编辑");
+      const body = await readBody(req);
+      const asDraft = body.action === "draft";
+      if (!body.title || !body.background || !body.content || !body.measures) return sendError(res, 400, "标题、背景、内容和措施为必填");
+      let input;
+      try {
+        input = proposalInputFromBody(user, body);
+      } catch (err) {
+        return sendError(res, err.status || 400, err.message);
+      }
+      const before = { ...proposal };
+      Object.assign(proposal, input, {
+        status: asDraft ? STATUS.DRAFT : STATUS.DEPT_PENDING,
+        updatedAt: now(),
+        submittedAt: asDraft ? proposal.submittedAt || "" : now(),
+      });
+      proposal.pointsBreakdown = calculateProposalPointBreakdown(proposal).items;
+      logOperation(db, user.id, asDraft ? "更新提案草稿" : "编辑并提交提案", "proposal", proposal.id, before, proposal, req);
+      saveDb(db);
+      return sendJson(res, enrichProposal(db, proposal));
+    }
+
+    if (pathParts[1] === "proposals" && pathParts[2] && method === "DELETE") {
+      const index = db.proposals.findIndex((item) => item.id === pathParts[2]);
+      const proposal = db.proposals[index];
+      if (!proposal || (proposal.submitterId !== user.id && !canAdmin(user))) return sendError(res, 404, "提案不存在");
+      if (proposal.status !== STATUS.DRAFT) return sendError(res, 400, "只能删除草稿状态的提案");
+      db.proposals.splice(index, 1);
+      logOperation(db, user.id, "删除提案草稿", "proposal", proposal.id, proposal, null, req);
+      saveDb(db);
+      return sendJson(res, { ok: true });
     }
 
     if (pathParts[1] === "proposals" && pathParts[2] && method === "GET") {
@@ -727,7 +845,7 @@ async function handleApi(req, res, url) {
     if (pathParts[1] === "proposals" && pathParts[2] && pathParts[3] === "submit" && method === "POST") {
       const proposal = db.proposals.find((item) => item.id === pathParts[2]);
       if (!proposal || proposal.submitterId !== user.id) return sendError(res, 404, "提案不存在");
-      if (![STATUS.DRAFT, STATUS.DEPT_REJECTED, STATUS.FINANCE_REJECTED, STATUS.LEAN_REJECTED].includes(proposal.status)) return sendError(res, 400, "当前状态不可提交");
+      if (![STATUS.DRAFT, STATUS.DEPT_REJECTED, STATUS.FINANCE_REJECTED, STATUS.LEAN_REJECTED, STATUS.COMMITTEE_REJECTED].includes(proposal.status)) return sendError(res, 400, "当前状态不可提交");
       const before = { ...proposal };
       proposal.status = STATUS.DEPT_PENDING;
       proposal.submittedAt = now();
@@ -740,20 +858,47 @@ async function handleApi(req, res, url) {
     if (pathParts[1] === "proposals" && pathParts[2] && pathParts[3] === "department-review" && method === "POST") {
       const proposal = db.proposals.find((item) => item.id === pathParts[2]);
       if (!proposal) return sendError(res, 404, "提案不存在");
-      if (!canDeptReview(user, proposal)) return sendError(res, 403, "无部门初审权限");
-      if (proposal.status !== STATUS.DEPT_PENDING) return sendError(res, 400, "当前状态不可初审");
+      if (!canDeptReview(user, proposal)) return sendError(res, 403, "无部门评估权限");
+      if (![STATUS.DEPT_PENDING, STATUS.RETRIAL].includes(proposal.status)) return sendError(res, 400, "当前状态不可初评");
       const body = await readBody(req);
       const before = { ...proposal };
+      const evaluationType = PROPOSAL_EVALUATION_TYPES.includes(body.evaluationType) ? String(body.evaluationType) : (proposal.evaluationType || "正常改善");
+      const originalLevel = PROPOSAL_LEVELS.includes(body.originalLevel) ? String(body.originalLevel) : (proposal.originalLevel || proposal.level || "四级");
+      const isHorizontalExpansion = body.isHorizontalExpansion === true || body.isHorizontalExpansion === "on" || body.isHorizontalExpansion === "true";
+      proposal.evaluationType = evaluationType;
+      proposal.originalLevel = originalLevel;
+      proposal.level = originalLevel;
+      proposal.isHorizontalExpansion = isHorizontalExpansion;
+      proposal.rewardLevel = resolveRewardLevel(originalLevel, isHorizontalExpansion);
+      proposal.siteConfirmed = body.siteConfirmed === true || body.siteConfirmed === "on" || body.siteConfirmed === "true";
+      proposal.siteConfirmedBy = proposal.siteConfirmed ? user.id : "";
+      proposal.siteConfirmedAt = proposal.siteConfirmed ? now() : "";
+      proposal.siteConfirmNote = String(body.siteConfirmNote || "");
       if (body.result === "reject") {
         if (!body.opinion) return sendError(res, 400, "驳回必须填写原因");
         proposal.status = STATUS.DEPT_REJECTED;
+      } else if (evaluationType !== "正常改善") {
+        proposal.status = STATUS.INVALID_CLOSED;
+        proposal.awardedPoints = 0;
+        proposal.pointsBreakdown = calculateProposalPointBreakdown(proposal).items;
       } else {
+        if (!proposal.siteConfirmed) return sendError(res, 400, "通过部门评估前必须完成现场确认");
         proposal.status = proposal.benefitType === "财务创效" ? STATUS.FINANCE_PENDING : STATUS.LEAN_PENDING;
       }
-      proposal.approvals.push({ node: "部门初审", approverId: user.id, result: body.result === "reject" ? "驳回" : "通过", opinion: String(body.opinion || ""), at: now() });
+      proposal.approvals.push({
+        node: "部门评估组初评",
+        approverId: user.id,
+        result: body.result === "reject" ? "驳回" : (evaluationType !== "正常改善" ? "无效关闭" : "通过"),
+        opinion: String(body.opinion || ""),
+        evaluationType,
+        originalLevel,
+        rewardLevel: proposal.rewardLevel,
+        siteConfirmed: proposal.siteConfirmed,
+        at: now(),
+      });
       proposal.updatedAt = now();
-      notify(db, proposal.submitterId, "部门初审结果", `提案${body.result === "reject" ? "被驳回" : "已通过部门初审"}`, `提案“${proposal.title}”状态变更为${proposal.status}。`);
-      logOperation(db, user.id, "部门初审", "proposal", proposal.id, before, proposal, req);
+      notify(db, proposal.submitterId, "部门评估结果", `提案${body.result === "reject" ? "被驳回" : "已完成部门评估"}`, `提案“${proposal.title}”状态变更为${proposal.status}。`);
+      logOperation(db, user.id, "部门评估组初评", "proposal", proposal.id, before, proposal, req);
       saveDb(db);
       return sendJson(res, enrichProposal(db, proposal));
     }
@@ -791,16 +936,74 @@ async function handleApi(req, res, url) {
       if (body.result === "reject") {
         if (!body.opinion) return sendError(res, 400, "驳回必须填写原因");
         proposal.status = STATUS.LEAN_REJECTED;
+      } else if (body.result === "return-dept") {
+        if (!body.opinion) return sendError(res, 400, "退回部门评估组必须填写原因");
+        proposal.status = STATUS.RETRIAL;
       } else {
-        proposal.level = String(body.level || proposal.level || "四级");
+        const originalLevel = PROPOSAL_LEVELS.includes(body.originalLevel || body.level) ? String(body.originalLevel || body.level) : (proposal.originalLevel || proposal.level || "四级");
+        const isHorizontalExpansion = body.isHorizontalExpansion === true || body.isHorizontalExpansion === "on" || body.isHorizontalExpansion === "true";
+        proposal.originalLevel = originalLevel;
+        proposal.level = originalLevel;
+        proposal.isHorizontalExpansion = isHorizontalExpansion;
+        proposal.rewardLevel = resolveRewardLevel(originalLevel, isHorizontalExpansion);
         proposal.actualBenefit = String(body.actualBenefit || proposal.actualBenefit || "");
-        proposal.status = STATUS.ARCHIVED;
-        distributeProposalPoints(db, proposal, user.id);
+        proposal.committeeRequired = requiresCommittee(proposal.rewardLevel);
+        if (proposal.committeeRequired) {
+          proposal.committeeStatus = "待核准";
+          proposal.status = STATUS.COMMITTEE_PENDING;
+        } else {
+          proposal.status = STATUS.ARCHIVED;
+          distributeProposalPoints(db, proposal, user.id);
+        }
       }
-      proposal.approvals.push({ node: "精益办复审", approverId: user.id, result: body.result === "reject" ? "驳回" : "通过", opinion: String(body.opinion || ""), level: proposal.level, at: now() });
+      proposal.approvals.push({
+        node: "精益办复审",
+        approverId: user.id,
+        result: body.result === "reject" ? "驳回" : (body.result === "return-dept" ? "退回部门评估组" : "通过"),
+        opinion: String(body.opinion || ""),
+        originalLevel: proposal.originalLevel || proposal.level,
+        rewardLevel: proposal.rewardLevel || proposal.level,
+        committeeRequired: Boolean(proposal.committeeRequired),
+        at: now(),
+      });
       proposal.updatedAt = now();
       notify(db, proposal.submitterId, "精益办复审结果", `提案${body.result === "reject" ? "被驳回" : "已通过复审"}`, `提案“${proposal.title}”状态变更为${proposal.status}。`);
       logOperation(db, user.id, "精益办复审", "proposal", proposal.id, before, proposal, req);
+      saveDb(db);
+      return sendJson(res, enrichProposal(db, proposal));
+    }
+
+    if (pathParts[1] === "proposals" && pathParts[2] && pathParts[3] === "committee-review" && method === "POST") {
+      const proposal = db.proposals.find((item) => item.id === pathParts[2]);
+      if (!proposal) return sendError(res, 404, "提案不存在");
+      if (!canCommittee(user)) return sendError(res, 403, "无评审委员会核准权限");
+      if (proposal.status !== STATUS.COMMITTEE_PENDING) return sendError(res, 400, "当前状态不可委员会核准");
+      const body = await readBody(req);
+      const before = { ...proposal };
+      if (body.result === "reject") {
+        if (!body.opinion) return sendError(res, 400, "驳回必须填写原因");
+        proposal.status = STATUS.COMMITTEE_REJECTED;
+        proposal.committeeStatus = "驳回";
+      } else if (body.result === "return-dept") {
+        if (!body.opinion) return sendError(res, 400, "退回部门评估组必须填写原因");
+        proposal.status = STATUS.RETRIAL;
+        proposal.committeeStatus = "退回重审";
+      } else {
+        proposal.status = STATUS.ARCHIVED;
+        proposal.committeeStatus = "核准通过";
+        distributeProposalPoints(db, proposal, user.id);
+      }
+      proposal.approvals.push({
+        node: "评审委员会核准",
+        approverId: user.id,
+        result: body.result === "reject" ? "驳回" : (body.result === "return-dept" ? "退回部门评估组" : "通过"),
+        opinion: String(body.opinion || ""),
+        rewardLevel: proposal.rewardLevel || proposal.level,
+        at: now(),
+      });
+      proposal.updatedAt = now();
+      notify(db, proposal.submitterId, "委员会核准结果", `提案${proposal.committeeStatus}`, `提案“${proposal.title}”状态变更为${proposal.status}。`);
+      logOperation(db, user.id, "评审委员会核准", "proposal", proposal.id, before, proposal, req);
       saveDb(db);
       return sendJson(res, enrichProposal(db, proposal));
     }
@@ -1092,7 +1295,7 @@ async function handleApi(req, res, url) {
               deptId: dept.id,
               post: valueFrom(row, ["岗位", "职位", "post"]),
               role,
-              passwordHash: hashPassword("123456"),
+              passwordHash: hashPassword(`${employeeNo}@`),
               status,
             };
             db.users.push(target);
@@ -1143,6 +1346,7 @@ async function handleApi(req, res, url) {
       }
 
       logOperation(db, user.id, `导入${type}`, "import", type, null, { created, updated, errors }, req);
+      syncReviewCommittee(db);
       saveDb(db);
       return sendJson(res, { created, updated, errors });
     }
@@ -1153,16 +1357,28 @@ async function handleApi(req, res, url) {
   }
 }
 
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  if (url.pathname.startsWith("/api/")) {
-    handleApi(req, res, url);
-    return;
-  }
-  serveStatic(req, res, url.pathname);
-});
+function createServer() {
+  return http.createServer((req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    if (url.pathname.startsWith("/api/")) {
+      handleApi(req, res, url);
+      return;
+    }
+    serveStatic(req, res, url.pathname);
+  });
+}
 
-server.listen(PORT, () => {
-  console.log(`煜昌电器改善提案系统已启动: http://localhost:${PORT}`);
-  console.log("测试账号: A001 / E001 / D001 / F001 / L001，密码均为 123456");
-});
+if (require.main === module) {
+  const server = createServer();
+  server.listen(PORT, () => {
+    console.log(`煜昌电器改善提案系统已启动: http://localhost:${PORT}`);
+    console.log("测试账号: A001 / E001 / D001 / F001 / L001，密码为对应工号加 @，如 A001@");
+  });
+}
+
+module.exports = {
+  createServer,
+  handleApi,
+  loadDb,
+  saveDb,
+};
