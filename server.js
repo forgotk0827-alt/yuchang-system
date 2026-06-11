@@ -40,6 +40,15 @@ const {
   canFinance,
   canCommittee,
 } = require("./src/auth");
+const {
+  calculateProposalPoints,
+  calculateProposalPointBreakdown,
+  addLedger: pointsAddLedger,
+  distributeProposalPoints,
+  clearAnnualAvailablePoints,
+  resolveRewardLevel,
+  requiresCommittee,
+} = require("./src/points");
 
 function now() {
   return new Date().toISOString();
@@ -364,145 +373,7 @@ function notify(db, receiverId, type, title, content) {
 }
 
 function addLedger(db, userId, type, points, sourceType, sourceId, remark, operatorId) {
-  const account = accountFor(db, userId);
-  account.balance += points;
-  if (points > 0) {
-    account.totalEarned += points;
-    account.annualPoints += points;
-  } else {
-    account.totalDeducted += Math.abs(points);
-  }
-  const ledger = {
-    id: uid("pl"),
-    userId,
-    type,
-    points,
-    sourceType,
-    sourceId,
-    balanceAfter: account.balance,
-    remark,
-    operatorId,
-    createdAt: now(),
-  };
-  db.pointsLedger.unshift(ledger);
-  return ledger;
-}
-
-function calculateProposalPoints(proposal) {
-  return calculateProposalPointBreakdown(proposal).total;
-}
-
-function levelIndex(level) {
-  return PROPOSAL_LEVELS.indexOf(level);
-}
-
-function downgradeLevel(level) {
-  const index = levelIndex(level);
-  return index > 0 ? PROPOSAL_LEVELS[index - 1] : "四级";
-}
-
-function resolveRewardLevel(originalLevel, isHorizontalExpansion) {
-  const level = PROPOSAL_LEVELS.includes(originalLevel) ? originalLevel : "四级";
-  return isHorizontalExpansion ? downgradeLevel(level) : level;
-}
-
-function requiresCommittee(level) {
-  return ["二级", "一级"].includes(level);
-}
-
-function calculateProposalPointBreakdown(proposal) {
-  if (proposal.projectType === "有效焦点课题") {
-    const scale = FOCUS_TOPIC_SCALES[proposal.focusTopicScale] || FOCUS_TOPIC_SCALES.small;
-    const coreCount = (proposal.participants || []).filter((participant) => participant.role === "核心组员").slice(0, scale.maxCoreMembers).length;
-    const items = [
-      { type: "有效焦点课题", project: `${scale.label} / 课题组长奖励`, points: scale.leaderPoints, distributionMode: "focus_leader" },
-    ];
-    if (scale.corePoints > 0 && coreCount > 0) {
-      items.push({ type: "有效焦点课题", project: `${scale.label} / 核心组员奖励（最多${scale.maxCoreMembers}人）`, points: scale.corePoints * coreCount, distributionMode: "focus_core" });
-    }
-    return { items, total: items.reduce((sum, item) => sum + item.points, 0) };
-  }
-  const base = 20;
-  const levelMap = { "四级": 60, "三级": 100, "二级": 200, "一级": 400 };
-  if (proposal.evaluationType && proposal.evaluationType !== "正常改善") {
-    return {
-      items: [{ type: "判定结果", project: `${proposal.evaluationType}类项目不纳入改善提案积分`, points: 0, distributionMode: "none" }],
-      total: 0,
-    };
-  }
-  const rewardLevel = proposal.rewardLevel || proposal.level;
-  const items = [
-    { type: "基础参与积分", project: "有效改善提案", points: base, distributionMode: "participant_ratio" },
-  ];
-  const levelPoints = levelMap[rewardLevel] || 0;
-  if (levelPoints > 0) {
-    const project = proposal.isHorizontalExpansion
-      ? `水平展开项目：原评${proposal.originalLevel || proposal.level}，奖励按${rewardLevel}`
-      : `提案实施效果评级：${rewardLevel}`;
-    items.push({ type: "案例价值积分", project, points: levelPoints, distributionMode: "participant_ratio" });
-  }
-  const amount = Number(proposal.financeAmount || 0);
-  if (proposal.benefitType === "财务创效" && amount > 0) {
-    let financePoints;
-    if (amount <= 2000) financePoints = Math.round(amount * 0.01);
-    else if (amount <= 20000) financePoints = Math.round(20 + (amount - 2000) * 0.02);
-    else financePoints = Math.round(380 + (amount - 20000) * 0.03);
-    items.push({ type: "专项激励积分", project: "财务创效奖励", points: financePoints, distributionMode: "leader_allocated" });
-  }
-  return { items, total: items.reduce((sum, item) => sum + item.points, 0) };
-}
-
-function aggregateDistribution(points, participants) {
-  const rows = participants?.length ? participants : [];
-  if (!rows.length) return [];
-  const allocations = new Map();
-  let distributed = 0;
-  rows.forEach((participant, index) => {
-    const isLast = index === rows.length - 1;
-    const share = isLast ? points - distributed : Math.round(points * Number(participant.ratio || 0) / 100);
-    distributed += share;
-    if (share <= 0) return;
-    const current = allocations.get(participant.userId) || { userId: participant.userId, points: 0, roles: [] };
-    current.points += share;
-    current.roles.push(participant.role);
-    allocations.set(participant.userId, current);
-  });
-  return Array.from(allocations.values());
-}
-
-function focusTopicDistribution(item, proposal) {
-  const scale = FOCUS_TOPIC_SCALES[proposal.focusTopicScale] || FOCUS_TOPIC_SCALES.small;
-  const participants = proposal.participants || [];
-  const leader = participants.find((participant) => participant.role === "课题组长") || { userId: proposal.submitterId, role: "课题组长" };
-  if (item.distributionMode === "focus_leader") {
-    return [{ userId: leader.userId, points: scale.leaderPoints, roles: ["课题组长"] }];
-  }
-  const cores = participants.filter((participant) => participant.role === "核心组员" && participant.userId !== leader.userId).slice(0, scale.maxCoreMembers);
-  return cores.map((participant) => ({ userId: participant.userId, points: scale.corePoints, roles: ["核心组员"] }));
-}
-
-function distributeProposalPoints(db, proposal, operatorId) {
-  const breakdown = calculateProposalPointBreakdown(proposal);
-  const participantDistribution = proposal.participants?.length ? proposal.participants : [{ userId: proposal.submitterId, role: "提出人", ratio: 100 }];
-  breakdown.items.forEach((item) => {
-    if (item.distributionMode?.startsWith("focus_")) {
-      focusTopicDistribution(item, proposal).forEach((allocation) => {
-        if (allocation.points <= 0) return;
-        addLedger(db, allocation.userId, POINT_TYPES.PROPOSAL, allocation.points, "proposal", proposal.id, `${proposal.proposalNo} ${proposal.title} ${item.type}/${item.project} ${allocation.roles.join("、")}`, operatorId);
-        notify(db, allocation.userId, "积分到账", "有效焦点课题积分到账", `课题“${proposal.title}”${item.project}到账 ${allocation.points} 分。`);
-      });
-      return;
-    }
-    const distribution = item.distributionMode === "leader_allocated" && proposal.financeDistribution?.length
-      ? proposal.financeDistribution
-      : participantDistribution;
-    aggregateDistribution(item.points, distribution).forEach((allocation) => {
-      addLedger(db, allocation.userId, POINT_TYPES.PROPOSAL, allocation.points, "proposal", proposal.id, `${proposal.proposalNo} ${proposal.title} ${item.type}/${item.project} ${allocation.roles.join("、")}`, operatorId);
-      notify(db, allocation.userId, "积分到账", "改善提案积分到账", `提案“${proposal.title}”${item.project}到账 ${allocation.points} 分。`);
-    });
-  });
-  proposal.awardedPoints = breakdown.total;
-  proposal.pointsBreakdown = breakdown.items;
+  return pointsAddLedger(db, accountFor, now, userId, type, points, sourceType, sourceId, remark, operatorId);
 }
 
 function visibleProposals(db, user) {
@@ -909,7 +780,7 @@ async function handleApi(req, res, url) {
           proposal.status = STATUS.COMMITTEE_PENDING;
         } else {
           proposal.status = STATUS.ARCHIVED;
-          distributeProposalPoints(db, proposal, user.id);
+          distributeProposalPoints(db, proposal, user.id, { addLedger, notify, now });
         }
       }
       proposal.approvals.push({
@@ -947,7 +818,7 @@ async function handleApi(req, res, url) {
       } else {
         proposal.status = STATUS.ARCHIVED;
         proposal.committeeStatus = "核准通过";
-        distributeProposalPoints(db, proposal, user.id);
+        distributeProposalPoints(db, proposal, user.id, { addLedger, notify, now });
       }
       proposal.approvals.push({
         node: "评审委员会核准",
@@ -971,6 +842,21 @@ async function handleApi(req, res, url) {
         account: accountFor(db, targetUserId),
         ledger: db.pointsLedger.filter((item) => item.userId === targetUserId).slice(0, 100),
       });
+    }
+
+    if (url.pathname === "/api/points/annual-clear" && method === "POST") {
+      if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无年度清零权限");
+      const body = await readBody(req);
+      const clearAt = String(body.clearAt || now());
+      const records = clearAnnualAvailablePoints(db, user.id, clearAt);
+      logOperation(db, user.id, "年度积分清零", "points", "annual-clear", null, { clearAt, records: records.length }, req);
+      saveDb(db);
+      return sendJson(res, { clearAt, records });
+    }
+
+    if (url.pathname === "/api/points/annual-clears" && method === "GET") {
+      if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无年度清零查看权限");
+      return sendJson(res, db.annualClears || []);
     }
 
     if (url.pathname === "/api/points/adjust" && method === "POST") {
