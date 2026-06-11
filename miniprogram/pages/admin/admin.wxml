@@ -1,0 +1,12 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">管理中心</view>
+    <view class="subtle">组织、报表、日志和导入操作统一从这里进入。</view>
+  </view>
+
+  <view class="grid-2">
+    <view wx:for="{{items}}" wx:key="key" class="panel admin-entry" bindtap="openPage" data-url="{{item.url}}">
+      <view class="title small-title">{{item.label}}</view>
+    </view>
+  </view>
+</view>

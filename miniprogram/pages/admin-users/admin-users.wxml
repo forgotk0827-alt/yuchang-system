@@ -1,0 +1,18 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">员工列表</view>
+    <view class="subtle">当前展示账号、角色、部门和状态。</view>
+  </view>
+
+  <view class="panel stack" wx:if="{{users.length}}">
+    <view wx:for="{{users}}" wx:key="id" class="list-item">
+      <view class="row">
+        <view>{{item.name}}</view>
+        <view class="subtle">{{item.status}}</view>
+      </view>
+      <view class="subtle">{{item.employeeNo}} · {{item.role}}</view>
+      <view class="subtle">{{item.deptName || '未分配部门'}} · {{item.post || '-'}}</view>
+    </view>
+  </view>
+  <view wx:else class="panel empty">暂无员工数据</view>
+</view>

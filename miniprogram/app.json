@@ -8,6 +8,10 @@
     "pages/points/points",
     "pages/redemptions/redemptions",
     "pages/profile/profile",
+    "pages/admin/admin",
+    "pages/admin-users/admin-users",
+    "pages/admin-reports/admin-reports",
+    "pages/admin-logs/admin-logs",
     "pages/admin-import/admin-import"
   ],
   "window": {

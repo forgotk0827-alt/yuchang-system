@@ -11,6 +11,7 @@
   </view>
 
   <button wx:if="{{canImport}}" class="btn" bindtap="openImport">员工导入</button>
+  <button wx:if="{{canManage}}" class="btn" bindtap="openAdmin">管理中心</button>
 
   <button class="btn btn-danger" bindtap="logout">退出登录</button>
 </view>

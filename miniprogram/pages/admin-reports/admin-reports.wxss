@@ -1,0 +1,9 @@
+.list-item {
+  border-bottom: 1rpx solid #edf2f1;
+  padding-bottom: 20rpx;
+}
+
+.list-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}

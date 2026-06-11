@@ -981,6 +981,14 @@ async function handleApi(req, res, url) {
       return sendJson(res, { proposalByDept: Object.values(byDept), employeePoints });
     }
 
+    if (url.pathname === "/api/admin/users" && method === "GET") {
+      if (!canAdmin(user) && !canLean(user)) return sendError(res, 403, "无员工管理权限");
+      return sendJson(res, db.users.map((item) => ({
+        ...publicUser(item),
+        deptName: departmentName(db, item.deptId),
+      })));
+    }
+
     if (url.pathname === "/api/export/proposals" && method === "GET") {
       const rows = [["提案编号", "标题", "提交人", "部门", "状态", "类型", "等级", "预计积分", "创建时间"]];
       visibleProposals(db, user).forEach((proposal) => rows.push([proposal.proposalNo, proposal.title, userName(db, proposal.submitterId), departmentName(db, proposal.deptId), proposal.status, proposal.benefitType, proposal.level, calculateProposalPoints(proposal), proposal.createdAt]));
@@ -995,6 +1003,10 @@ async function handleApi(req, res, url) {
     if (url.pathname === "/api/logs" && method === "GET") {
       if (!canAdmin(user)) return sendError(res, 403, "无日志查看权限");
       return sendJson(res, db.operationLogs.slice(0, 200).map((item) => ({ ...item, operatorName: userName(db, item.operatorId) })));
+    }
+
+    if (url.pathname === "/api/notifications" && method === "GET") {
+      return sendJson(res, db.notifications.filter((item) => item.receiverId === user.id).slice(0, 100));
     }
 
     if (url.pathname === "/api/import/users-template" && method === "GET") {

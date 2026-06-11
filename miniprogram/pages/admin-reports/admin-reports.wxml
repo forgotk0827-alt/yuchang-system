@@ -1,0 +1,29 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">提案部门统计</view>
+    <view wx:if="{{proposalByDept.length}}" class="stack">
+      <view wx:for="{{proposalByDept}}" wx:key="dept" class="list-item">
+        <view class="row">
+          <view>{{item.dept}}</view>
+          <view>{{item.total}} 件</view>
+        </view>
+        <view class="subtle">通过 {{item.approved}} · 驳回 {{item.rejected}} · 发分 {{item.points}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无统计数据</view>
+  </view>
+
+  <view class="panel stack">
+    <view class="title">员工积分排行</view>
+    <view wx:if="{{employeePoints.length}}" class="stack">
+      <view wx:for="{{employeePoints}}" wx:key="userName" class="list-item">
+        <view class="row">
+          <view>{{index + 1}}. {{item.userName}}</view>
+          <view>{{item.totalEarned}}</view>
+        </view>
+        <view class="subtle">{{item.deptName}} · 可用 {{item.balance}} · 扣减 {{item.totalDeducted}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无积分数据</view>
+  </view>
+</view>

@@ -1,0 +1,14 @@
+<view class="page stack">
+  <view class="panel stack" wx:if="{{logs.length}}">
+    <view class="title">最近操作</view>
+    <view wx:for="{{logs}}" wx:key="id" class="list-item">
+      <view class="row">
+        <view>{{item.action}}</view>
+        <view class="subtle">{{item.operatorName || '-'}}</view>
+      </view>
+      <view class="subtle">{{item.objectType}} / {{item.objectId}}</view>
+      <view class="subtle">{{item.createdAt}}</view>
+    </view>
+  </view>
+  <view wx:else class="panel empty">暂无日志数据</view>
+</view>

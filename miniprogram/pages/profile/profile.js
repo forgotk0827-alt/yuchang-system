@@ -4,7 +4,8 @@ Page({
   data: {
     user: {},
     department: "",
-    canImport: false
+    canImport: false,
+    canManage: false
   },
 
   onShow() {
@@ -19,7 +20,8 @@ Page({
       this.setData({
         user,
         department: data.department || "",
-        canImport: ["超级管理员", "精益办复审"].includes(user.role)
+        canImport: ["超级管理员", "精益办复审"].includes(user.role),
+        canManage: ["超级管理员", "精益办复审"].includes(user.role)
       });
       wx.setStorageSync("yc_user", data.user);
     } catch (err) {
@@ -29,6 +31,10 @@ Page({
 
   openImport() {
     wx.navigateTo({ url: "/pages/admin-import/admin-import" });
+  },
+
+  openAdmin() {
+    wx.navigateTo({ url: "/pages/admin/admin" });
   },
 
   async logout() {

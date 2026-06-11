@@ -1,0 +1,9 @@
+.admin-entry {
+  min-height: 160rpx;
+  display: flex;
+  align-items: center;
+}
+
+.small-title {
+  font-size: 30rpx;
+}
