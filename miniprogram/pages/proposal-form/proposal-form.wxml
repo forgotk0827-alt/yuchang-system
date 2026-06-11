@@ -1,0 +1,84 @@
+<view class="page stack">
+  <view class="panel stack">
+    <view class="title">{{id ? '编辑改善提案' : '新建改善提案'}}</view>
+
+    <view class="field">
+      <view class="label">提案标题 *</view>
+      <input value="{{form.title}}" bindinput="onInput" data-field="title" />
+    </view>
+
+    <view class="field">
+      <view class="label">项目类型</view>
+      <picker range="{{projectTypes}}" value="{{projectTypeIndex}}" bindchange="onPicker" data-field="projectType">
+        <view class="picker-value">{{form.projectType}}</view>
+      </picker>
+    </view>
+
+    <view class="field" wx:if="{{form.projectType === '有效焦点课题'}}">
+      <view class="label">焦点课题规模</view>
+      <picker range="{{focusScales}}" range-key="label" value="{{focusScaleIndex}}" bindchange="onFocusScale">
+        <view class="picker-value">{{focusScales[focusScaleIndex].label}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <view class="label">提案类别</view>
+      <picker range="{{categories}}" value="{{categoryIndex}}" bindchange="onPicker" data-field="category">
+        <view class="picker-value">{{form.category}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <view class="label">效益类型</view>
+      <picker range="{{benefitTypes}}" value="{{benefitTypeIndex}}" bindchange="onPicker" data-field="benefitType">
+        <view class="picker-value">{{form.benefitType}}</view>
+      </picker>
+    </view>
+
+    <view class="field" wx:if="{{form.benefitType === '财务创效'}}">
+      <view class="label">财务创效金额</view>
+      <input type="number" value="{{form.financeAmount}}" bindinput="onInput" data-field="financeAmount" />
+    </view>
+
+    <view class="field">
+      <view class="label">评级预估</view>
+      <picker range="{{levels}}" value="{{levelIndex}}" bindchange="onPicker" data-field="level">
+        <view class="picker-value">{{form.level}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <view class="label">改善背景 *</view>
+      <textarea value="{{form.background}}" bindinput="onInput" data-field="background" />
+    </view>
+    <view class="field">
+      <view class="label">改善内容 *</view>
+      <textarea value="{{form.content}}" bindinput="onInput" data-field="content" />
+    </view>
+    <view class="field">
+      <view class="label">改善措施 *</view>
+      <textarea value="{{form.measures}}" bindinput="onInput" data-field="measures" />
+    </view>
+    <view class="field">
+      <view class="label">预期效益</view>
+      <textarea value="{{form.expectedBenefit}}" bindinput="onInput" data-field="expectedBenefit" />
+    </view>
+    <view class="field">
+      <view class="label">实际效益</view>
+      <textarea value="{{form.actualBenefit}}" bindinput="onInput" data-field="actualBenefit" />
+    </view>
+
+    <view class="field" wx:if="{{id}}">
+      <view class="label">附件</view>
+      <button class="btn" bindtap="chooseAttachment">上传附件</button>
+      <view wx:if="{{attachments.length}}" class="stack">
+        <view wx:for="{{attachments}}" wx:key="id" class="subtle">{{item.originalName}}</view>
+      </view>
+    </view>
+
+    <view class="row-actions">
+      <button class="btn action-btn" bindtap="saveDraft">保存草稿</button>
+      <button class="btn action-btn btn-primary" bindtap="submit">提交评估</button>
+    </view>
+  </view>
+</view>

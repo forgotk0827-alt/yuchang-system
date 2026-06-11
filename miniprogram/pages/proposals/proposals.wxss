@@ -1,0 +1,49 @@
+.mini {
+  width: 132rpx;
+  min-height: 72rpx;
+  font-size: 26rpx;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.segment {
+  min-height: 72rpx;
+  border-radius: 12rpx;
+  background: #e7edf8;
+  color: #4e5d78;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.segment-active {
+  background: #0033A1;
+  color: #fff;
+}
+
+.proposal-item {
+  border-bottom: 1rpx solid #edf2f1;
+  padding-bottom: 20rpx;
+}
+
+.proposal-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.proposal-title {
+  max-width: 420rpx;
+  font-weight: 700;
+}
+
+.action-btn {
+  width: 150rpx;
+  min-height: 64rpx;
+  font-size: 24rpx;
+}

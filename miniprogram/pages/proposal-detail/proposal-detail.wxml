@@ -1,0 +1,117 @@
+<view class="page stack" wx:if="{{item.id}}">
+  <view class="panel stack">
+    <view class="row">
+      <view class="title detail-title">{{item.title}}</view>
+      <view class="status {{item.statusClass}}">{{item.status}}</view>
+    </view>
+    <view class="subtle">{{item.proposalNo}} · {{item.submitterName}} / {{item.deptName}}</view>
+    <view class="info-grid">
+      <view><text class="subtle">项目类型</text><view>{{item.projectType || '普通改善提案'}}</view></view>
+      <view><text class="subtle">效益类型</text><view>{{item.benefitType}}</view></view>
+      <view><text class="subtle">奖励等级</text><view>{{item.rewardLevel || item.level}}</view></view>
+      <view><text class="subtle">预计积分</text><view>{{item.estimatedPoints}}</view></view>
+    </view>
+  </view>
+
+  <view class="panel stack">
+    <view class="section-title">内容</view>
+    <view class="subtle">背景</view>
+    <view>{{item.background}}</view>
+    <view class="subtle">内容</view>
+    <view>{{item.content}}</view>
+    <view class="subtle">措施</view>
+    <view>{{item.measures}}</view>
+    <view class="subtle">实际效益</view>
+    <view>{{item.actualBenefit || '-'}}</view>
+  </view>
+
+  <view class="panel stack">
+    <view class="section-title">积分明细</view>
+    <view wx:for="{{item.pointsBreakdown}}" wx:key="project" class="row">
+      <view>{{item.type}} / {{item.project}}</view>
+      <view>{{item.points}} 分</view>
+    </view>
+  </view>
+
+  <view class="panel stack" wx:if="{{canDeptReview}}">
+    <view class="section-title">部门评估</view>
+    <view class="field">
+      <view class="label">评定类型</view>
+      <picker range="{{evaluationTypes}}" value="{{evaluationTypeIndex}}" bindchange="onEvaluationTypeChange">
+        <view class="picker-value">{{review.evaluationType}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="label">原始等级</view>
+      <picker range="{{levels}}" value="{{levelIndex}}" bindchange="onLevelChange">
+        <view class="picker-value">{{review.originalLevel}}</view>
+      </picker>
+    </view>
+    <view class="switch-row">
+      <view>现场确认</view>
+      <switch checked="{{review.siteConfirmed}}" data-field="siteConfirmed" bindchange="onReviewSwitch" color="#0033A1" />
+    </view>
+    <view class="switch-row">
+      <view>水平展开</view>
+      <switch checked="{{review.isHorizontalExpansion}}" data-field="isHorizontalExpansion" bindchange="onReviewSwitch" color="#0033A1" />
+    </view>
+    <textarea value="{{review.siteConfirmNote}}" data-field="siteConfirmNote" bindinput="onReviewInput" placeholder="填写现场确认说明" />
+    <textarea value="{{review.opinion}}" data-field="opinion" bindinput="onReviewInput" placeholder="填写评估意见" />
+    <view class="row-actions">
+      <button class="btn action-btn btn-danger" bindtap="submitReview" data-action="dept" data-result="reject">驳回</button>
+      <button class="btn action-btn btn-primary" bindtap="submitReview" data-action="dept" data-result="approve">通过</button>
+    </view>
+  </view>
+
+  <view class="panel stack" wx:if="{{canFinanceReview}}">
+    <view class="section-title">财务复核</view>
+    <input type="number" value="{{review.financeAmount}}" data-field="financeAmount" bindinput="onReviewInput" placeholder="填写财务创效金额" />
+    <textarea value="{{review.opinion}}" data-field="opinion" bindinput="onReviewInput" placeholder="填写财务复核意见" />
+    <view class="row-actions">
+      <button class="btn action-btn btn-danger" bindtap="submitReview" data-action="finance" data-result="reject">驳回</button>
+      <button class="btn action-btn btn-primary" bindtap="submitReview" data-action="finance" data-result="approve">通过</button>
+    </view>
+  </view>
+
+  <view class="panel stack" wx:if="{{canLeanReview}}">
+    <view class="section-title">精益办复审</view>
+    <view class="field">
+      <view class="label">复审等级</view>
+      <picker range="{{levels}}" value="{{levelIndex}}" bindchange="onLevelChange">
+        <view class="picker-value">{{review.originalLevel}}</view>
+      </picker>
+    </view>
+    <view class="switch-row">
+      <view>水平展开</view>
+      <switch checked="{{review.isHorizontalExpansion}}" data-field="isHorizontalExpansion" bindchange="onReviewSwitch" color="#0033A1" />
+    </view>
+    <textarea value="{{review.actualBenefit}}" data-field="actualBenefit" bindinput="onReviewInput" placeholder="填写实际效益" />
+    <textarea value="{{review.opinion}}" data-field="opinion" bindinput="onReviewInput" placeholder="填写复审意见" />
+    <view class="row-actions wrap-actions">
+      <button class="btn action-btn btn-danger" bindtap="submitReview" data-action="lean" data-result="reject">驳回</button>
+      <button class="btn action-btn" bindtap="submitReview" data-action="lean" data-result="return-dept">退回</button>
+      <button class="btn action-btn btn-primary" bindtap="submitReview" data-action="lean" data-result="approve">通过</button>
+    </view>
+  </view>
+
+  <view class="panel stack">
+    <view class="section-title">审批记录</view>
+    <view wx:if="{{item.approvals.length}}" class="stack">
+      <view wx:for="{{item.approvals}}" wx:key="at" class="list-item">
+        <view>{{item.node}} · {{item.result}}</view>
+        <view class="subtle">{{item.opinion || '-'}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无审批记录</view>
+  </view>
+
+  <view class="panel stack" wx:if="{{canCommitteeReview}}">
+    <view class="section-title">评审委员会核准</view>
+    <textarea value="{{review.opinion}}" data-field="opinion" bindinput="onReviewInput" placeholder="填写核准意见" />
+    <view class="row-actions wrap-actions">
+      <button class="btn action-btn btn-danger" bindtap="submitReview" data-action="committee" data-result="reject">驳回</button>
+      <button class="btn action-btn" bindtap="submitReview" data-action="committee" data-result="return-dept">退回</button>
+      <button class="btn action-btn btn-primary" bindtap="submitReview" data-action="committee" data-result="approve">通过</button>
+    </view>
+  </view>
+</view>

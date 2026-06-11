@@ -1,0 +1,48 @@
+.detail-title {
+  max-width: 440rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22rpx;
+}
+
+.action-btn {
+  width: 160rpx;
+  min-height: 72rpx;
+  font-size: 24rpx;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.label {
+  font-size: 24rpx;
+  color: #61707d;
+}
+
+.picker-value {
+  min-height: 84rpx;
+  display: flex;
+  align-items: center;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72rpx;
+}
+
+.wrap-actions {
+  flex-wrap: wrap;
+}

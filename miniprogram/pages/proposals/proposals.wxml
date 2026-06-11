@@ -1,0 +1,37 @@
+<view class="page stack">
+  <view class="row">
+    <view>
+      <view class="title">改善提案</view>
+      <view class="subtle">提交、评估、复审和归档</view>
+    </view>
+    <button class="btn btn-primary mini" bindtap="newProposal">新建</button>
+  </view>
+
+  <view class="segmented">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="segment {{activeTab === item.key ? 'segment-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="switchTab"
+    >{{item.label}}</view>
+  </view>
+
+  <view class="panel stack" wx:if="{{items.length}}">
+    <view wx:for="{{items}}" wx:key="id" class="list-item proposal-item">
+      <view bindtap="openDetail" data-id="{{item.id}}">
+        <view class="row">
+          <view class="proposal-title">{{item.title}}</view>
+          <view class="status {{item.statusClass}}">{{item.status}}</view>
+        </view>
+        <view class="subtle">{{item.proposalNo}} · {{item.projectType || '普通改善提案'}} · {{item.rewardLevel || item.level}}</view>
+        <view class="subtle">{{item.submitterName}} / {{item.deptName}} · 预计 {{item.estimatedPoints}} 分</view>
+      </view>
+      <view class="row-actions" wx:if="{{item.canEdit || item.canDelete}}">
+        <button wx:if="{{item.canEdit}}" class="btn action-btn" bindtap="editProposal" data-id="{{item.id}}">编辑</button>
+        <button wx:if="{{item.canDelete}}" class="btn action-btn btn-danger" bindtap="deleteDraft" data-id="{{item.id}}">删除</button>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="panel empty">当前分组暂无提案</view>
+</view>

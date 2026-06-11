@@ -1,0 +1,10 @@
+.picker-value {
+  min-height: 84rpx;
+  display: flex;
+  align-items: center;
+}
+
+.action-btn {
+  flex: 1;
+  min-height: 84rpx;
+}
