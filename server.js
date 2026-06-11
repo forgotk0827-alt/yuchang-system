@@ -60,6 +60,12 @@ const {
   listRedemptions,
   upsertGift,
 } = require("./src/redemptions");
+const {
+  readImportRows,
+  findOrCreateDepartment,
+  importData,
+} = require("./src/imports");
+const { buildReports } = require("./src/reports");
 
 function now() {
   return new Date().toISOString();
@@ -242,106 +248,12 @@ function safeFileName(filename) {
   return `${base}${ext}`;
 }
 
-function csvRows(text) {
-  const source = text.replace(/^\ufeff/, "");
-  const rows = [];
-  let row = [];
-  let value = "";
-  let quoted = false;
-  for (let i = 0; i < source.length; i += 1) {
-    const char = source[i];
-    const next = source[i + 1];
-    if (quoted) {
-      if (char === '"' && next === '"') {
-        value += '"';
-        i += 1;
-      } else if (char === '"') {
-        quoted = false;
-      } else {
-        value += char;
-      }
-      continue;
-    }
-    if (char === '"') quoted = true;
-    else if (char === ",") {
-      row.push(value.trim());
-      value = "";
-    } else if (char === "\n") {
-      row.push(value.trim());
-      rows.push(row);
-      row = [];
-      value = "";
-    } else if (char !== "\r") {
-      value += char;
-    }
-  }
-  if (value || row.length) {
-    row.push(value.trim());
-    rows.push(row);
-  }
-  return rows.filter((item) => item.some(Boolean));
-}
-
-function csvObjects(text) {
-  const rows = csvRows(text);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map((header) => header.trim());
-  return rows.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ""])));
-}
-
-function rowsToObjects(rows) {
-  if (!rows.length) return [];
-  const headers = rows[0].map((header) => String(header || "").trim());
-  return rows.slice(1)
-    .map((row) => Object.fromEntries(headers.map((header, index) => [header, String(row[index] ?? "").trim()])))
-    .filter((row) => Object.values(row).some(Boolean));
-}
-
-function workbookObjects(buffer) {
-  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const sheetName = workbook.SheetNames.find((name) => name.includes("员工")) || workbook.SheetNames[0];
-  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "" });
-  return rowsToObjects(rows);
-}
-
-async function readImportRows(req) {
-  const contentType = req.headers["content-type"] || "";
-  if (contentType.includes("multipart/form-data")) {
-    const buffer = await readBuffer(req, MAX_UPLOAD_SIZE);
-    const file = parseMultipart(req, buffer).find((part) => part.filename);
-    if (!file) throw new Error("请选择要导入的文件");
-    const ext = path.extname(file.filename).toLowerCase();
-    if (ext === ".csv") return csvObjects(file.data.toString("utf8"));
-    if (ext === ".xls" || ext === ".xlsx") return workbookObjects(file.data);
-    throw new Error("仅支持 .csv、.xls、.xlsx 文件");
-  }
-  const body = await readBody(req);
-  return csvObjects(String(body.csv || ""));
-}
-
-function valueFrom(row, keys) {
-  for (const key of keys) {
-    if (row[key] !== undefined && row[key] !== "") return row[key];
-  }
-  return "";
-}
-
 function requireAdminOrLean(user, res, message) {
   if (!canAdmin(user) && !canLean(user)) {
     sendError(res, 403, message);
     return false;
   }
   return true;
-}
-
-function findOrCreateDepartment(db, name) {
-  const deptName = String(name || "").trim() || "未分配部门";
-  let dept = db.departments.find((item) => item.name === deptName);
-  if (!dept) {
-    dept = { id: uid("d"), name: deptName, parentId: "", leaderId: "", status: "启用" };
-    db.departments.push(dept);
-  }
-  return dept;
 }
 
 function canDeptReview(user, proposal) {
@@ -978,24 +890,8 @@ async function handleApi(req, res, url) {
     }
 
     if (url.pathname === "/api/reports" && method === "GET") {
-      const proposals = visibleProposals(db, user);
-      const byDept = {};
-      proposals.forEach((proposal) => {
-        const key = departmentName(db, proposal.deptId);
-        byDept[key] ||= { dept: key, total: 0, approved: 0, rejected: 0, points: 0 };
-        byDept[key].total += 1;
-        if ([STATUS.APPROVED, STATUS.ARCHIVED].includes(proposal.status)) byDept[key].approved += 1;
-        if (proposal.status.includes("驳回")) byDept[key].rejected += 1;
-        byDept[key].points += proposal.awardedPoints || 0;
-      });
-      const employeePoints = db.pointsAccounts.map((account) => ({
-        userName: userName(db, account.userId),
-        deptName: departmentName(db, db.users.find((u) => u.id === account.userId)?.deptId),
-        balance: account.balance,
-        totalEarned: account.totalEarned,
-        totalDeducted: account.totalDeducted,
-      })).sort((a, b) => b.totalEarned - a.totalEarned);
-      return sendJson(res, { proposalByDept: Object.values(byDept), employeePoints });
+      const report = buildReports(db, visibleProposals(db, user), departmentName, userName, STATUS);
+      return sendJson(res, report);
     }
 
     if (url.pathname === "/api/admin/users" && method === "GET") {
@@ -1071,117 +967,14 @@ async function handleApi(req, res, url) {
       } else {
         return sendError(res, 404, "导入类型不存在");
       }
-      const rows = await readImportRows(req);
+      const rows = await readImportRows(req, { readBody, readBuffer, parseMultipart });
       if (!rows.length) return sendError(res, 400, "文件内容为空或缺少表头");
-      let created = 0;
-      let updated = 0;
-      const errors = [];
-
-      if (type === "departments") {
-        rows.forEach((row, index) => {
-          const name = valueFrom(row, ["部门名称", "1级部门", "2级部门", "部门", "name"]);
-          if (!name) {
-            errors.push(`第 ${index + 2} 行缺少部门名称`);
-            return;
-          }
-          let dept = db.departments.find((item) => item.name === name);
-          const leaderNameOrNo = valueFrom(row, ["负责人编号", "部门主管", "leaderNo"]);
-          const leader = db.users.find((item) => item.employeeNo === leaderNameOrNo || item.name === leaderNameOrNo);
-          const parent = db.departments.find((item) => item.name === valueFrom(row, ["上级部门", "1级部门", "parentName"]));
-          if (!dept) {
-            dept = { id: uid("d"), name, parentId: parent?.id || "", leaderId: leader?.id || "", status: valueFrom(row, ["状态", "员工状态", "status"]) || "启用" };
-            db.departments.push(dept);
-            created += 1;
-          } else {
-            dept.parentId = parent?.id || dept.parentId || "";
-            dept.leaderId = leader?.id || dept.leaderId || "";
-            dept.status = valueFrom(row, ["状态", "员工状态", "status"]) || dept.status || "启用";
-            updated += 1;
-          }
-        });
-      }
-
-      if (type === "users") {
-        const validRoles = new Set(Object.values(ROLES));
-        rows.forEach((row, index) => {
-          const name = valueFrom(row, ["姓名", "name"]);
-          let employeeNo = valueFrom(row, ["员工编号", "工号", "employeeNo"]);
-          let phone = valueFrom(row, ["手机号/账号", "手机号", "手机", "phone"]) || employeeNo;
-          const role = valueFrom(row, ["角色", "role"]) || ROLES.EMPLOYEE;
-          if (!name) {
-            errors.push(`第 ${index + 2} 行缺少姓名`);
-            return;
-          }
-          if (!employeeNo) employeeNo = phone || `AUTO_${String(index + 1).padStart(4, "0")}`;
-          if (!phone) phone = employeeNo;
-          if (!validRoles.has(role)) {
-            errors.push(`第 ${index + 2} 行角色无效：${role}`);
-            return;
-          }
-          const deptName = valueFrom(row, ["2级部门", "部门", "1级部门", "department"]);
-          const dept = findOrCreateDepartment(db, deptName);
-          const rawStatus = valueFrom(row, ["在职状态", "员工状态", "status"]);
-          const status = rawStatus === "离职" ? "禁用" : (rawStatus || "在职");
-          let target = db.users.find((item) => item.employeeNo === employeeNo);
-          if (!target) {
-            target = {
-              id: uid("u"),
-              employeeNo,
-              name,
-              phone,
-              deptId: dept.id,
-              post: valueFrom(row, ["岗位", "职位", "post"]),
-              role,
-              passwordHash: hashPassword(`${employeeNo}@`),
-              status,
-            };
-            db.users.push(target);
-            accountFor(db, target.id);
-            created += 1;
-          } else {
-            target.name = name;
-            target.phone = phone;
-            target.deptId = dept.id;
-            target.post = valueFrom(row, ["岗位", "职位", "post"]) || target.post || "";
-            target.role = role;
-            target.status = status || target.status || "在职";
-            updated += 1;
-          }
-        });
-      }
-
-      if (type === "gifts") {
-        rows.forEach((row, index) => {
-          const name = row["礼品名称"] || row.name;
-          const requiredPoints = Number(row["所需积分"] || row.requiredPoints || 0);
-          if (!name || !requiredPoints) {
-            errors.push(`第 ${index + 2} 行缺少礼品名称或所需积分`);
-            return;
-          }
-          let gift = db.gifts.find((item) => item.name === name && item.quarterVersion === (row["季度版本"] || row.quarterVersion || "未设置"));
-          if (!gift) {
-            gift = {
-              id: uid("g"),
-              name,
-              requiredPoints,
-              referenceValue: Number(row["参考价值"] || row.referenceValue || 0),
-              stockQty: Number(row["初始库存"] || row.stockQty || 0),
-              reservedQty: 0,
-              quarterVersion: row["季度版本"] || row.quarterVersion || "未设置",
-              status: row["状态"] || row.status || "启用",
-            };
-            db.gifts.push(gift);
-            created += 1;
-          } else {
-            gift.requiredPoints = requiredPoints;
-            gift.referenceValue = Number(row["参考价值"] || row.referenceValue || gift.referenceValue || 0);
-            gift.stockQty = Number(row["初始库存"] || row.stockQty || gift.stockQty || 0);
-            gift.status = row["状态"] || row.status || gift.status || "启用";
-            updated += 1;
-          }
-        });
-      }
-
+      const { created, updated, errors } = importData(db, type, rows, {
+        uid,
+        hashPassword,
+        accountFor,
+        findOrCreateDepartment: (innerDb, name) => findOrCreateDepartment(innerDb, name, { uid }),
+      });
       logOperation(db, user.id, `导入${type}`, "import", type, null, { created, updated, errors }, req);
       syncReviewCommittee(db);
       saveDb(db);
