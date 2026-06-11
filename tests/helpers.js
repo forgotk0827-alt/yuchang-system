@@ -1,4 +1,7 @@
 const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 function requestJson(port, path, options = {}) {
   const body = options.body === undefined ? undefined : JSON.stringify(options.body);
@@ -47,4 +50,52 @@ async function login(port, account, password) {
 module.exports = {
   requestJson,
   login,
+  createTempDbRoot,
+  startServer,
 };
+
+function createTempDbRoot() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "yuchang-auth-"));
+}
+
+async function startServer(options = {}) {
+  const originalEnv = {
+    YC_DATA_DIR: process.env.YC_DATA_DIR,
+    YC_DB_PATH: process.env.YC_DB_PATH,
+  };
+
+  if (options.dataDir) process.env.YC_DATA_DIR = options.dataDir;
+  if (options.dbPath) process.env.YC_DB_PATH = options.dbPath;
+
+  const configPath = require.resolve("../src/config");
+  const serverPath = require.resolve("../server");
+  delete require.cache[configPath];
+  delete require.cache[serverPath];
+
+  const { createServer } = require("../server");
+  const server = createServer();
+
+  await new Promise((resolve, reject) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+    server.once("error", reject);
+  });
+
+  const port = server.address().port;
+
+  async function stop() {
+    await new Promise((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+
+    if (originalEnv.YC_DATA_DIR === undefined) delete process.env.YC_DATA_DIR;
+    else process.env.YC_DATA_DIR = originalEnv.YC_DATA_DIR;
+
+    if (originalEnv.YC_DB_PATH === undefined) delete process.env.YC_DB_PATH;
+    else process.env.YC_DB_PATH = originalEnv.YC_DB_PATH;
+
+    delete require.cache[configPath];
+    delete require.cache[serverPath];
+  }
+
+  return { server, port, stop };
+}

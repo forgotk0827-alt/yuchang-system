@@ -28,6 +28,18 @@ const {
   parseMultipart,
   serveStatic,
 } = require("./src/http");
+const {
+  hashPassword,
+  getToken,
+  publicUser,
+  findLoginUser,
+  createSession,
+  requireAuth,
+  canAdmin,
+  canLean,
+  canFinance,
+  canCommittee,
+} = require("./src/auth");
 
 function now() {
   return new Date().toISOString();
@@ -40,10 +52,6 @@ function ensureDataDir() {
 
 function uid(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(4).toString("hex")}`;
-}
-
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(`yuchang:${password}`).digest("hex");
 }
 
 function defaultGifts() {
@@ -208,12 +216,6 @@ function syncReviewCommittee(db) {
   });
 }
 
-function publicUser(user) {
-  if (!user) return null;
-  const { passwordHash, ...rest } = user;
-  return rest;
-}
-
 function safeFileName(filename) {
   const ext = path.extname(filename).toLowerCase();
   const base = path.basename(filename, ext).replace(/[^\w\u4e00-\u9fa5.-]+/g, "_").slice(0, 80) || "file";
@@ -320,51 +322,6 @@ function findOrCreateDepartment(db, name) {
     db.departments.push(dept);
   }
   return dept;
-}
-
-function getToken(req) {
-  const auth = req.headers.authorization || "";
-  if (auth.startsWith("Bearer ")) return auth.slice(7);
-  try {
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-    return url.searchParams.get("access_token") || "";
-  } catch (err) {
-    return "";
-  }
-  return "";
-}
-
-function auth(req, db) {
-  const token = getToken(req);
-  const session = token && db.sessions[token];
-  if (!session) return null;
-  const user = db.users.find((item) => item.id === session.userId && item.status !== "禁用");
-  return user || null;
-}
-
-function requireAuth(req, res, db) {
-  const user = auth(req, db);
-  if (!user) {
-    sendError(res, 401, "请先登录");
-    return null;
-  }
-  return user;
-}
-
-function canAdmin(user) {
-  return user.role === ROLES.ADMIN;
-}
-
-function canLean(user) {
-  return user.role === ROLES.LEAN_OFFICE || canAdmin(user);
-}
-
-function canFinance(user) {
-  return user.role === ROLES.FINANCE || canAdmin(user);
-}
-
-function canCommittee(user) {
-  return Boolean(user.isReviewCommittee) || canLean(user);
 }
 
 function canDeptReview(user, proposal) {
@@ -639,10 +596,9 @@ async function handleApi(req, res, url) {
       const body = await readBody(req);
       const account = String(body.account || "").trim();
       const password = String(body.password || "");
-      const user = db.users.find((item) => (item.employeeNo === account || item.phone === account) && item.passwordHash === hashPassword(password) && item.status !== "禁用");
+      const user = findLoginUser(db, account, password);
       if (!user) return sendError(res, 401, "账号或密码错误");
-      const token = crypto.randomBytes(24).toString("hex");
-      db.sessions[token] = { userId: user.id, createdAt: now() };
+      const token = createSession(db, user.id, now());
       logOperation(db, user.id, "登录系统", "session", token, null, { account }, req);
       saveDb(db);
       return sendJson(res, { token, user: publicUser(user) });

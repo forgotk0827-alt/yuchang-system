@@ -1,12 +1,11 @@
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-
+const DATA_DIR = process.env.YC_DATA_DIR || path.join(ROOT, "data");
+const DB_PATH = process.env.YC_DB_PATH || path.join(DATA_DIR, "db.json");
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(ROOT, "public");
-const DATA_DIR = path.join(ROOT, "data");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const DB_PATH = path.join(DATA_DIR, "db.json");
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 const MAX_JSON_BODY_SIZE = 2 * 1024 * 1024;
 const ALLOWED_UPLOAD_EXT = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".txt"]);
