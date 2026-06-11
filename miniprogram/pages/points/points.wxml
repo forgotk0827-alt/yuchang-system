@@ -1,0 +1,35 @@
+<view class="page stack">
+  <view class="title">积分账户</view>
+  <view class="grid-2">
+    <view class="panel metric">
+      <view class="metric-label">当前余额</view>
+      <view class="metric-value">{{account.balance || 0}}</view>
+    </view>
+    <view class="panel metric">
+      <view class="metric-label">预占积分</view>
+      <view class="metric-value">{{account.reserved || 0}}</view>
+    </view>
+    <view class="panel metric">
+      <view class="metric-label">年度积分</view>
+      <view class="metric-value">{{account.annualPoints || 0}}</view>
+    </view>
+    <view class="panel metric">
+      <view class="metric-label">累计扣减</view>
+      <view class="metric-value">{{account.totalDeducted || 0}}</view>
+    </view>
+  </view>
+
+  <view class="panel stack">
+    <view class="title small-title">积分流水</view>
+    <view wx:if="{{ledger.length}}" class="stack">
+      <view wx:for="{{ledger}}" wx:key="id" class="list-item">
+        <view class="row">
+          <view>{{item.type}}</view>
+          <view>{{item.points > 0 ? '+' : ''}}{{item.points}}</view>
+        </view>
+        <view class="subtle">{{item.remark}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无流水</view>
+  </view>
+</view>

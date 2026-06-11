@@ -1,0 +1,24 @@
+.small-title {
+  font-size: 30rpx;
+}
+
+.gift {
+  border-bottom: 1rpx solid #edf2f1;
+  padding-bottom: 20rpx;
+}
+
+.gift:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.gift-title {
+  font-weight: 700;
+  max-width: 420rpx;
+}
+
+.action-btn {
+  width: 132rpx;
+  min-height: 68rpx;
+  font-size: 24rpx;
+}

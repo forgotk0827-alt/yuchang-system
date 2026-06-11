@@ -1,0 +1,32 @@
+<view class="page stack">
+  <view class="title">积分兑换</view>
+  <view class="panel stack">
+    <view class="title small-title">礼品目录</view>
+    <view wx:if="{{gifts.length}}" class="stack">
+      <view wx:for="{{gifts}}" wx:key="id" class="list-item gift">
+        <view class="row">
+          <view>
+            <view class="gift-title">{{item.name}}</view>
+            <view class="subtle">{{item.requiredPoints}} 分 · 参考 {{item.referenceValue}} 元 · 库存 {{item.availableStock}}</view>
+          </view>
+          <button class="btn action-btn btn-primary" bindtap="redeem" data-id="{{item.id}}">兑换</button>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无礼品</view>
+  </view>
+
+  <view class="panel stack">
+    <view class="title small-title">兑换记录</view>
+    <view wx:if="{{redemptions.length}}" class="stack">
+      <view wx:for="{{redemptions}}" wx:key="id" class="list-item">
+        <view class="row">
+          <view>{{item.giftName}}</view>
+          <view class="status">{{item.status}}</view>
+        </view>
+        <view class="subtle">{{item.points}} 分 · {{item.receiveStatus}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无兑换记录</view>
+  </view>
+</view>

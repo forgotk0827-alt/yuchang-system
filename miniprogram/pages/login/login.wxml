@@ -1,0 +1,18 @@
+<view class="login page">
+  <view class="panel stack">
+    <view>
+      <view class="title">煜昌改善提案系统</view>
+      <view class="subtle">员工登录后提交提案、查看积分和兑换礼品</view>
+    </view>
+    <view class="field">
+      <view class="label">账号</view>
+      <input value="{{account}}" bindinput="onInput" data-field="account" placeholder="工号或手机号" />
+    </view>
+    <view class="field">
+      <view class="label">密码</view>
+      <input password value="{{password}}" bindinput="onInput" data-field="password" placeholder="默认：工号@" />
+    </view>
+    <button class="btn btn-primary" loading="{{loading}}" bindtap="login">登录</button>
+    <view class="subtle">账号为工号，初始密码为工号后加 @，例如 A001@</view>
+  </view>
+</view>
