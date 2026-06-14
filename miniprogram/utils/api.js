@@ -15,6 +15,10 @@ function request(path, options = {}) {
       header,
       success(res) {
         if (res.statusCode === 401) {
+          if (path === "/api/login") {
+            reject(new Error(res.data?.error || "账号或密码错误"));
+            return;
+          }
           wx.removeStorageSync("yc_token");
           wx.removeStorageSync("yc_user");
           wx.reLaunch({ url: "/pages/login/login" });
@@ -52,6 +56,10 @@ function upload(path, filePath, name = "file", formData = {}) {
           return;
         }
         if (res.statusCode === 401) {
+          if (path === "/api/login") {
+            reject(new Error(data.error || "账号或密码错误"));
+            return;
+          }
           wx.removeStorageSync("yc_token");
           wx.removeStorageSync("yc_user");
           wx.reLaunch({ url: "/pages/login/login" });

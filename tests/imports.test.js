@@ -40,3 +40,31 @@ test("importData 导入员工时自动建部门并生成默认密码", () => {
   assert.equal(db.users[0].employeeNo, "T001");
   assert.equal(db.users[0].passwordHash, hashPassword("T001@"));
 });
+
+test("importData 支持 工号/登录账号 列名", () => {
+  const db = {
+    departments: [],
+    users: [],
+    gifts: [],
+    pointsAccounts: [],
+  };
+
+  const result = importData(
+    db,
+    "users",
+    [{ "工号/登录账号": "YC000001", 姓名: "鲍永", 一级部门: "总经办", 职位: "总经理", 员工状态: "正式" }],
+    {
+      uid: (prefix) => `${prefix}_1`,
+      hashPassword,
+      accountFor: (innerDb, userId) => {
+        const account = { id: `pa_${userId}`, userId, balance: 0, reserved: 0, annualPoints: 0, totalEarned: 0, totalDeducted: 0 };
+        innerDb.pointsAccounts.push(account);
+        return account;
+      },
+    }
+  );
+
+  assert.equal(result.created, 1);
+  assert.equal(db.users[0].employeeNo, "YC000001");
+  assert.equal(db.users[0].passwordHash, hashPassword("YC000001@"));
+});

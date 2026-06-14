@@ -130,7 +130,7 @@ function importData(db, type, rows, helpers) {
     const validRoles = new Set(Object.values(ROLES));
     rows.forEach((row, index) => {
       const name = valueFrom(row, ["姓名", "name"]);
-      let employeeNo = valueFrom(row, ["员工编号", "工号", "employeeNo"]);
+      let employeeNo = valueFrom(row, ["员工编号", "工号", "工号/登录账号", "登录账号", "employeeNo"]);
       let phone = valueFrom(row, ["手机号/账号", "手机号", "手机", "phone"]) || employeeNo;
       const role = valueFrom(row, ["角色", "role"]) || ROLES.EMPLOYEE;
       if (!name) {
